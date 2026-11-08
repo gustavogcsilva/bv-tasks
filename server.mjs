@@ -33,14 +33,35 @@ const MIME_TYPES = {
 
 const port = Number(process.env.PORT) || 4173;
 
+const SECURITY_HEADERS = {
+  'X-Content-Type-Options': 'nosniff',
+  'X-Frame-Options': 'DENY',
+  'Referrer-Policy': 'strict-origin-when-cross-origin',
+  'Permissions-Policy': 'camera=(self), microphone=(), geolocation=()',
+};
+
 const server = http.createServer((req, res) => {
+  for (const [name, value] of Object.entries(SECURITY_HEADERS)) {
+    res.setHeader(name, value);
+  }
   try {
     const parsedUrl = new URL(req.url || '/', `http://${req.headers.host || 'localhost'}`);
-    const safePathname = path
-      .normalize(decodeURIComponent(parsedUrl.pathname))
-      .replace(/^(\.\.(\/|\\|$))+/, '');
+    let decodedPathname;
+    try {
+      decodedPathname = decodeURIComponent(parsedUrl.pathname);
+    } catch {
+      res.writeHead(400, { 'Content-Type': 'text/plain; charset=utf-8' });
+      res.end('Bad Request');
+      return;
+    }
 
-    let filePath = path.join(distDir, safePathname);
+    // Proteção contra Path Traversal: o arquivo resolvido precisa estar dentro de dist/
+    let filePath = path.resolve(distDir, '.' + path.posix.normalize('/' + decodedPathname));
+    if (filePath !== distDir && !filePath.startsWith(distDir + path.sep)) {
+      res.writeHead(403, { 'Content-Type': 'text/plain; charset=utf-8' });
+      res.end('Forbidden');
+      return;
+    }
 
     if (fs.existsSync(filePath) && fs.statSync(filePath).isDirectory()) {
       filePath = path.join(filePath, 'index.html');
