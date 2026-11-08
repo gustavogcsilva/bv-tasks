@@ -1,11 +1,11 @@
 /**
- * Service Worker do B V Tasks PWA (v5)
+ * Service Worker do B V Tasks PWA (v6)
  * - Network-First para navegação HTML (evita tela em branco após novo deploy no Render)
  * - Stale-While-Revalidate seguro para assets (valida Content-Type para nunca salvar HTML como JS/CSS)
  * - Limpeza automática de caches antigos
  */
 
-const CACHE_VERSION = 'bv-tasks-v5';
+const CACHE_VERSION = 'bv-tasks-v6';
 const STATIC_CACHE = `${CACHE_VERSION}-static`;
 const RUNTIME_CACHE = `${CACHE_VERSION}-runtime`;
 

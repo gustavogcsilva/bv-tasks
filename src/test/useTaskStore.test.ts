@@ -24,7 +24,7 @@ describe('useTaskStore — Autenticação (Google, E-mail, Recuperação), Tema 
   it('deve criar conta com palavra-chave, recuperar senha por palavra-chave ou link de e-mail, e logar com Google', () => {
     const res = useTaskStore
       .getState()
-      .registerAccount('Bruno Vinicius', 'bv@tasks.com', '1234', 'malbec');
+      .registerAccount('Bruno Vinicius', 'bv@tasks.com', '123456', 'malbec');
 
     expect(res.ok).toBe(true);
     expect(useTaskStore.getState().currentUser?.name).toBe('Bruno Vinicius');
@@ -33,12 +33,12 @@ describe('useTaskStore — Autenticação (Google, E-mail, Recuperação), Tema 
     useTaskStore.getState().logoutAccount();
     const wrongKeyword = useTaskStore
       .getState()
-      .resetPasswordWithKeyword('bv@tasks.com', 'errada', 'nova123');
+      .resetPasswordWithKeyword('bv@tasks.com', 'errada', 'nova123456');
     expect(wrongKeyword.ok).toBe(false);
 
     const rightKeyword = useTaskStore
       .getState()
-      .resetPasswordWithKeyword('bv@tasks.com', 'malbec', 'nova123');
+      .resetPasswordWithKeyword('bv@tasks.com', 'malbec', 'nova123456');
     expect(rightKeyword.ok).toBe(true);
     expect(useTaskStore.getState().currentUser?.email).toBe('bv@tasks.com');
 

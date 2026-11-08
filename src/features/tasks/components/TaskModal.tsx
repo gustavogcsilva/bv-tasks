@@ -163,18 +163,18 @@ export function TaskModal({
       role="dialog"
       aria-modal="true"
       aria-labelledby="task-modal-title"
-      className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 backdrop-blur-[2px] sm:items-center sm:p-4"
+      className="animate-modal-backdrop fixed inset-0 z-50 flex items-end justify-center bg-black/60 backdrop-blur-[2px] sm:items-center sm:p-4"
     >
       <div aria-hidden="true" onClick={close} className="fixed inset-0" />
 
-      <div className="safe-bottom relative z-10 flex max-h-[92dvh] w-full max-w-lg flex-col rounded-t-[24px] bg-[#F8F7F4] px-[22px] pt-2.5 pb-7 shadow-2xl sm:rounded-[24px] dark:border dark:border-[#27272A] dark:bg-[#141418]">
+      <div className="animate-modal-content safe-bottom relative z-10 flex max-h-[92dvh] w-full max-w-lg flex-col rounded-t-[24px] bg-[#F8F7F4] px-[22px] pt-2.5 pb-7 shadow-2xl sm:rounded-[24px] dark:border dark:border-[#27272A] dark:bg-[#141418]">
         <div className="mx-auto mb-4 h-1 w-[38px] shrink-0 rounded-full bg-[#D6D3CD] sm:hidden dark:bg-[#3F3F46]" />
 
         <div className="mb-4 flex items-center justify-between">
           <div>
             <h2
               id="task-modal-title"
-              className="font-serif text-[22px] font-bold text-[#0F0F12] dark:text-[#FAFAFA]"
+              className="text-[20px] font-bold tracking-tight text-[#0F0F12] dark:text-[#FAFAFA]"
             >
               Nova tarefa
             </h2>

@@ -1,50 +1,54 @@
 # 📖 Guia Simples: Tudo o que foi feito no B V Tasks
 
-Este guia foi escrito de forma simples e direta para que qualquer pessoa — mesmo sem conhecimento técnico — entenda todas as novidades e melhorias feitas no aplicativo **B V Tasks**.
+Este guia foi feito com linguagem clara e simples para que qualquer pessoa entenda todas as melhorias técnicas, visuais e de segurança que foram aplicadas no **B V Tasks**.
 
 ---
 
-## 1. Visual Executivo: Vermelho Vinho & Preto, Letras Profissionais e Modo Claro/Escuro 🍷🖤
+## 1. Segurança Reforçada: Fim do Convidado e Autenticação Real com Google 🛡️
 
-- **Cores Vermelho do Vinho e Preto:** Substituímos toda a cor roxa antiga por uma combinação sofisticada de **Vermelho Vinho (Bordeaux)** e **Preto Executivo**.
-- **Letras Profissionais:** Configuramos fontes elegantes de alta leitura (*Playfair Display* nos títulos e *Plus Jakarta Sans* nos textos e botões), deixando o aplicativo com aparência de agenda executiva.
-- **Botão Claro / Escuro (`☀️ Claro` / `🌙 Escuro`):** Tanto na tela de login quanto no topo do aplicativo, você pode alternar com um toque entre o **Modo Claro** (fundo marfim suave) e o **Modo Escuro** (fundo preto elegante que descansa a vista à noite e economiza bateria no celular).
-
----
-
-## 2. Nova Logo Completa: Garrafa de Vinho + Taça + Livro + Iniciais B V 🍾🍷📖
-
-Redesenhamos o brasão do aplicativo para incluir todos os símbolos pedidos:
-- Uma **garrafa de vinho** com rótulo vermelho vinho ao lado de uma **taça de vinho rubi**;
-- Um **livro aberto** na base;
-- E as iniciais **B** e **V** em letras clássicas nas laterais.
+- **Acesso de Convidado Foi Eliminado:** Não existe mais nenhuma brecha para entrar sem se identificar. Qualquer pessoa precisa ter uma conta legítima para acessar suas tarefas.
+- **Entrar com Conta do Google Verdadeira:**
+  - O botão do Google agora utiliza a tecnologia oficial do Google (Google Identity Services).
+  - O sistema confere se o e-mail é mesmo verificado pelo Google (como `@gmail.com`) e se a identidade é legítima, impedindo a criação de contas falsas sem autorização.
+- **Criar Conta Própria com Senha Segura:**
+  - Quem preferir pode criar uma conta usando seu e-mail e uma senha de no mínimo 6 caracteres.
+  - O sistema pede também uma **palavra-chave de segurança** (como o nome de um vinho ou livro favorito).
+- **Esqueci a Senha:** Se a pessoa esquecer a senha, ela pode recuperá-la de duas maneiras muito simples:
+  1. *Pela Palavra-Chave:* Responde à pergunta secreta e cria uma senha nova na hora.
+  2. *Por Link no E-mail:* Recebe um link no e-mail para cadastrar a nova senha com total segurança.
 
 ---
 
-## 3. Autenticação com Google, E-mail/Senha e Recuperação de Senha 🔐
+## 2. Tipografia Padronizada: Letras Modernas e Padrão Apple HIG ✍️
 
-Na tela de entrada, você tem total liberdade e segurança:
-1. **Entrar com o Google:** Um botão **"Continuar com o Google"** permite acessar o aplicativo com um único toque.
-2. **Criar Conta com E-mail e Senha:** Você cadastra seu nome, e-mail, senha e uma **palavra-chave de segurança** (por exemplo, o nome do seu vinho ou livro preferido). Depois de criar a conta uma vez, o aplicativo lembra de você automaticamente!
-3. **Se Esquecer a Senha ("Esqueci a senha"):** Criamos **duas formas** de recuperar o acesso na hora:
-   - **🔑 Por Palavra-Chave:** O aplicativo pergunta qual é a sua palavra-chave secreta e já deixa você escolher uma senha nova imediatamente.
-   - **✉️ Recebimento de Link por E-mail:** O aplicativo gera e envia um link de redefinição para o seu e-mail para você cadastrar uma nova senha.
+- **Fim das Letras Estranhas / Fora de Padrão:** As fontes antigas com serifa pesada foram substituídas pela tipografia executiva padrão dos aparelhos modernos (como as fontes nativas do iPhone e iPad).
+- **Leitura Fácil e Elegante:** Todos os títulos, datas, botões e textos agora têm o mesmo padrão de desenho limpo, moderno e profissional, tanto no celular quanto no computador.
 
 ---
 
-## 4. Notificações no Celular e Sincronização com o Calendário do iPhone e Android 🔔📅
+## 3. Animação Fluida ao Criar uma Tarefa ✨
 
-Agora o **B V Tasks** conversa diretamente com o seu celular (tanto **iPhone** quanto **Android**):
-- **🔔 Receber Notificações no Celular:** Você pode ativar os alertas no topo da tela ou clicar em **"🔔 Notificar"** em qualquer tarefa. Além disso, quando chega o horário exato (`HH:mm`) de uma tarefa do dia, o aplicativo dispara um lembrete automático no seu aparelho!
-- **📅 Sincronizar com o Calendário do Celular:**
-  - Cada tarefa tem o botão **"📅 Calendário (.ics)"** e **"Google Agenda"** (e no topo da agenda há o botão **"📲 Sincronizar Dia no Celular"**).
-  - Ao tocar nele no **iPhone** ou no **Android**, o celular abre automaticamente a agenda nativa do aparelho já com o título, horário e um **alarme automático 15 minutos antes**!
+- **Transição Suave:** Ao tocar em "Nova tarefa" e salvar, a janela se recolhe suavemente.
+- **Efeito de Destaque na Lista:** A tarefa criada aparece com uma animação elegante e uma luz suave na cor vermelho vinho ao redor dela, mostrando na hora para o usuário onde ela foi adicionada.
+- **Aviso na Tela (Toast) com Vibração no Celular:** Um aviso no topo da tela confirma que a tarefa foi criada com sucesso e, se você estiver no celular, o aparelho dá uma leve vibrada para confirmar o toque.
 
 ---
 
-## 5. Calendário à Esquerda, Pastas e Câmera/PDF Responsivos 📱💻
+## 4. Sincronização Mobile: Funciona 100% Online e Offline 📱🔄
 
-- **Responsivo para Todos os Aparelhos:** Funciona perfeitamente em qualquer telefone (**iPhone** e **Android**), tablet ou computador.
-- **Calendário à Esquerda:** Mostra os dias do mês com bolinhas nas cores de **Trabalho (Vinho)**, **Pessoal (Azul)** e **Estudo (Rosa)**.
-- **Pastas e Câmera/PDF:** Crie pastas personalizadas e use a **câmera do celular (`📷 Câmera`)** para guardar fotos ou anexar arquivos **PDF (`📎 Foto/PDF`)** dentro das tarefas.
-- **Hospedagem no Render:** O arquivo `render.yaml` já deixa tudo configurado para colocar o aplicativo no ar gratuitamente no Render.
+- **Funciona Sem Internet (Offline):** Você pode abrir o aplicativo no avião, no metrô ou sem sinal de celular. Todas as suas tarefas, pastas e fotos salvas ficam disponíveis normalmente no aparelho.
+- **Aviso no Topo da Tela:**
+  - Mostra **`🟢 Sincronizado`** quando tem internet.
+  - Mostra **`🟠 Modo Offline`** quando está sem conexão, avisando que nada se perde e tudo está guardado com segurança no aparelho.
+- **Reconexão Automática:** Assim que o celular volta a pegar Wi-Fi ou 4G/5G, o sistema sincroniza tudo automaticamente sem você precisar fazer nada.
+- **Sincronização com o Calendário do Celular:**
+  - Com um toque no botão **"📲 Sincronizar Dia no Celular"** ou **"📅 Calendário (.ics)"**, o aplicativo manda a tarefa para o calendário do seu celular (iPhone ou Android) com lembrete e alarme nativo configurados.
+- **Notificações:** O celular avisa você quando chega o horário de uma tarefa agendada.
+
+---
+
+## 5. Visual Executivo: Vinho, Preto e Claro/Escuro 🍷🖤
+
+- **Cores Sofisticadas:** Vermelho Vinho (Bordeaux) e Preto Ônix.
+- **Botão Claro/Escuro:** Dá para alternar entre o tema claro para usar de dia e o tema escuro para descansar a vista à noite.
+- **Logo Exclusiva:** Garrafa de vinho, taça rubi, livro aberto e as iniciais B e V.

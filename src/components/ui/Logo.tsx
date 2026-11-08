@@ -80,21 +80,23 @@ export function Logo({ size = 'md', showText = true }: LogoProps) {
           {/* Iniciais Profissionais B e V */}
           <text
             x="16"
-            y="64"
+            y="65"
             fill="#FFFFFF"
-            fontFamily="'Playfair Display', Georgia, 'Times New Roman', serif"
-            fontWeight="700"
-            fontSize="24"
+            fontFamily="system-ui, -apple-system, BlinkMacSystemFont, 'SF Pro Display', sans-serif"
+            fontWeight="800"
+            fontSize="23"
+            letterSpacing="-0.5"
           >
             B
           </text>
           <text
-            x="102"
-            y="64"
+            x="101"
+            y="65"
             fill="#FFFFFF"
-            fontFamily="'Playfair Display', Georgia, 'Times New Roman', serif"
-            fontWeight="700"
-            fontSize="24"
+            fontFamily="system-ui, -apple-system, BlinkMacSystemFont, 'SF Pro Display', sans-serif"
+            fontWeight="800"
+            fontSize="23"
+            letterSpacing="-0.5"
           >
             V
           </text>
@@ -103,10 +105,10 @@ export function Logo({ size = 'md', showText = true }: LogoProps) {
 
       {showText && (
         <div className="flex flex-col">
-          <span className="text-[10px] font-bold tracking-[1.8px] text-[#991B1B] uppercase dark:text-[#F87171]">
+          <span className="text-[10px] font-extrabold tracking-[2px] text-[#991B1B] uppercase dark:text-[#F87171]">
             EXECUTIVE PLANNER
           </span>
-          <span className="font-serif text-[23px] leading-tight font-bold tracking-tight text-[#0F0F12] dark:text-[#FAFAFA]">
+          <span className="text-[22px] leading-tight font-extrabold tracking-tight text-[#0F0F12] dark:text-[#FAFAFA]">
             B V Tasks
           </span>
         </div>

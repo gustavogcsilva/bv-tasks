@@ -86,7 +86,7 @@ export function CalendarStrip({ selectedDate, onSelectDate, tasks = [] }: Calend
     >
       <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
         <div className="flex items-center gap-2">
-          <h2 className="font-serif text-[19px] font-bold capitalize tracking-tight text-[#0F0F12] dark:text-[#FAFAFA]">
+          <h2 className="text-[18px] font-bold capitalize tracking-tight text-[#0F0F12] dark:text-[#FAFAFA]">
             {format(visibleMonth, 'MMMM yyyy', { locale: ptBR })}
           </h2>
           {!isSelectedToday && (

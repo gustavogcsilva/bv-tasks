@@ -1,30 +1,43 @@
 # B V Tasks 🍾🍷📖 — Executive Planner (Web, iPhone iOS & Android PWA)
 
-Aplicação web progressiva (**PWA — Progressive Web App**) de calendário interativo, pastas, captura de câmera/PDFs, notificações nativas e sincronização com o calendário do celular.
+Aplicação web progressiva (**PWA — Progressive Web App**) de calendário executivo interativo, gerenciamento de pastas, captura com câmera do celular/PDFs, notificações nativas e sincronização móvel tanto **online quanto offline**.
 
-Projetada com **tipografia executiva profissional** (*Playfair Display* + *Plus Jakarta Sans*), paleta **Vermelho Vinho (`#991B1B` / `#7F1D1D`) & Preto (`#0F0F12`)**, alternância entre **Modo Claro e Modo Escuro**, e logo exclusiva trazendo **Garrafa de Vinho + Taça de Vinho + Livro Aberto + Iniciais B V**.
+Construída no padrão **Apple Human Interface Guidelines (HIG)** com **tipografia executiva de sistema** (San Francisco / Inter), paleta **Vermelho Vinho (`#991B1B` / `#7F1D1D`) & Preto (`#09090B`)**, alternância instantânea entre **Modo Claro e Modo Escuro**, e logotipo exclusivo trazendo **Garrafa de Vinho + Taça de Vinho + Livro Aberto + Iniciais B V**.
 
 ---
 
-## 🎯 Funcionalidades Principais
+## 🎯 Destaques e Novas Funcionalidades
 
-- **Logo Exclusiva (Garrafa + Taça de Vinho + Livro + B V):** Brasão vetorial executivo em Vermelho Vinho, Preto e Dourado ([`Logo.tsx`](./src/components/ui/Logo.tsx) e [`public/icon.svg`](./public/icon.svg)).
-- **Tipografia Profissional & Modo Claro / Escuro (`☀️ Claro` / `🌙 Escuro`):**
-  - Fontes executivas (*Playfair Display* para títulos e *Plus Jakarta Sans* para interface e leitura).
-  - Alternância instantânea entre tema **Claro** (Marfim, Preto e Vinho Bordeaux) e **Escuro** (Preto Ônix `#09090B` e Vermelho Vinho).
-- **Autenticação Completa (Google + E-mail/Senha + Recuperação Dupla):**
-  - **Continuar com o Google:** Login rápido em 1 toque com conta Google.
-  - **E-mail e Senha com Sessão Permanente:** Uma vez criada a conta, o acesso permanece salvo no aparelho.
-  - **Recuperação de Senha ("Esqueci a senha"):**
-    1. **🔑 Por Palavra-Chave:** Pergunta pela palavra-chave de segurança cadastrada e permite criar uma nova senha na hora.
-    2. **✉️ Por Link no E-mail:** Gera e envia um link de redefinição para o e-mail para criação de uma nova senha.
-- **Notificações no Celular & Sincronização com o Calendário Nativo (iPhone e Android):**
-  - **🔔 Notificações Nativas:** Envia alertas diretamente no celular (via Web Notifications API & Service Worker) ao agendar, testar ou atingir o horário (`HH:mm`) da tarefa.
-  - **📅 Sincronização com Calendário do Celular (`.ics` & Google Agenda):** Exporta tarefas individuais ou o dia inteiro no padrão universal *iCalendar (`.ics`)* com alarme nativo (`VALARM`) para o **Calendário da Apple (iPhone)** e **Google/Samsung Calendar (Android)**.
-- **Calendário à Esquerda + Pastas + Câmera/PDFs:**
-  - Layout responsivo para iPhone, Android, Tablets e Computadores.
-  - Indicadores por escopo nos dias do calendário: **Trabalho (Vinho)**, **Pessoal (Azul)** e **Estudo (Rosa)**.
-  - Uso direto da **Câmera do Celular (`📷 Câmera`)** e upload de **Imagens e PDFs (`📎 Foto/PDF`)** por tarefa.
+### 1. 🛡️ Engenharia de Segurança & Autenticação Verificada
+- **Eliminação Total de Convidados:** Acesso anônimo ou botões de visitante/convidado foram estritamente removidos.
+- **Autenticação Real com Google (Google Identity Services / OAuth 2.0):**
+  - Integração com `https://accounts.google.com/gsi/client`.
+  - Validação rigorosa de tokens JWT: checagem de emissor oficial (`accounts.google.com`), validação de `email_verified: true`, verificação temporal de expiração e domínio verificado (`@gmail.com` ou Workspace).
+  - Autenticação direta e segura vinculada ao e-mail legítimo da conta Google com senha de segurança.
+- **Contas Próprias com Alta Segurança:**
+  - Cadastro obrigatório com validação estrita de e-mail e senhas fortes (mínimo de 6 caracteres).
+  - **Recuperação de Senha Dupla:**
+    - 🔑 *Por Palavra-Chave:* Resposta à pergunta secreta com redefinição imediata de senha.
+    - ✉️ *Por Link no E-mail:* Envio de link de recuperação com validação segura de token.
+  - **Sessão Permanente:** O login permanece autenticado no aparelho sem necessidade de logar novamente a cada acesso.
+
+### 2. ✍️ Tipografia Executiva Padronizada (Padrão Apple HIG)
+- Remoção de fontes serifadas extravagantes e fora do padrão.
+- Adoção da tipografia nativa de alta tecnologia Apple HIG (`-apple-system`, `BlinkMacSystemFont`, `SF Pro Display`, `Inter`, `system-ui`).
+- Hierarquia visual limpa e elegante com excelente legibilidade em iPhones, telas retina, celulares Android e computadores.
+
+### 3. ✨ Animação Fluida na Criação de Tarefas & Feedback Tátil
+- **Entrada Animada com Destaque:** Ao criar uma tarefa, o modal fecha com suavidade e a nova tarefa entra na lista com animação fluida (`animate-task-enter`) acompanhada de um pulso de brilho bordô (`animate-highlight-pulse`).
+- **Banner Executivo de Confirmação (Toast):** Notificação flutuante com confirmação visual e feedback tátil no celular via `navigator.vibrate`.
+
+### 4. 📱🔄 Sincronização Mobile & Funcionamento 100% Offline / Online
+- **Indicador Interativo de Conexão no Topo:**
+  - `🟢 Sincronizado (Online)` quando conectado à internet.
+  - `🟠 Modo Offline (Local Seguro)` quando sem conexão.
+- **Central de Sincronização:** Mostra a contagem de tarefas verificadas, integridade 100% garantida (IndexedDB/localStorage) e botão para sincronizar manualmente com animação giratória.
+- **Detecção Automática de Reconexão:** Ao recuperar o sinal (4G/5G/Wi-Fi), a aplicação sincroniza automaticamente e notifica o usuário.
+- **Exportação para o Calendário Nativo do Celular (.ics & Google Agenda):** Sincronização em 1 toque com o Calendário do iPhone (Apple Calendar) e Android com alertas nativos pré-configurados.
+- **Alertas no Celular:** Notificações disparadas no horário programado da tarefa (`HH:mm`).
 
 ---
 
@@ -45,10 +58,12 @@ npm run build
 
 ---
 
-## ☁️ Alocação no Render (`render.yaml`)
+## ☁️ Deploy no Render (`render.yaml`)
 
-O projeto inclui o arquivo [`render.yaml`](./render.yaml) pronto para deploy gratuito no **Render**:
-- **Build Command:** `npm install && npm run build`
+O repositório está configurado para deploy automático contínuo no **Render**:
+- **Ambiente:** Static Site
+- **Build Command:** `npm ci && npm run build`
 - **Publish Directory:** `dist`
+- **Prevenção de Cache Legado:** Headers otimizados com `no-cache` para `index.html` e `sw.js`, e cache imutável de longo prazo para os assets estáticos com hash.
 
-Para uma explicação simples e acessível para leigos, leia [**EXPLICACAO_PARA_LEIGOS.md**](./EXPLICACAO_PARA_LEIGOS.md).
+Para uma explicação acessível e detalhada para leigos, leia [**EXPLICACAO_PARA_LEIGOS.md**](./EXPLICACAO_PARA_LEIGOS.md).

@@ -90,7 +90,7 @@ export interface TaskStore {
   ) => { ok: boolean; error?: string };
   loginAccount: (email: string, password: string) => { ok: boolean; error?: string };
   loginWithGoogle: (
-    googleProfile?: { name: string; email: string },
+    googleProfile: { name: string; email: string; avatarUrl?: string; googleId?: string },
   ) => { ok: boolean; account: UserAccount };
   resetPasswordWithKeyword: (
     email: string,
@@ -215,14 +215,14 @@ export const useTaskStore = create<TaskStore>()(
         const normalizedEmail = email.trim().toLowerCase();
         const normalizedKeyword = (recoveryKeyword ?? '').trim().toLowerCase();
 
-        if (!trimmedName) {
-          return { ok: false, error: 'Informe seu nome completo ou apelido.' };
+        if (!trimmedName || trimmedName.length < 2) {
+          return { ok: false, error: 'Informe seu nome completo ou profissional.' };
         }
-        if (!normalizedEmail || !normalizedEmail.includes('@')) {
-          return { ok: false, error: 'Informe um e-mail válido.' };
+        if (!normalizedEmail || !normalizedEmail.includes('@') || normalizedEmail.length < 5) {
+          return { ok: false, error: 'Informe um endereço de e-mail válido.' };
         }
-        if (password.length < 4) {
-          return { ok: false, error: 'A senha deve ter pelo menos 4 caracteres.' };
+        if (password.length < 6) {
+          return { ok: false, error: 'A senha deve conter no mínimo 6 caracteres.' };
         }
 
         const existing = get().registeredAccounts.find((a) => a.email === normalizedEmail);
@@ -263,13 +263,36 @@ export const useTaskStore = create<TaskStore>()(
       },
 
       loginWithGoogle: (googleProfile) => {
-        const email = (googleProfile?.email ?? 'usuario.google@gmail.com').trim().toLowerCase();
-        const name = (googleProfile?.name ?? 'Conta Google B V').trim();
+        const email = (googleProfile.email ?? '').trim().toLowerCase();
+        const name = (googleProfile.name ?? '').trim() || email.split('@')[0];
+
+        if (!email || !email.includes('@')) {
+          return {
+            ok: false,
+            account: {
+              id: '',
+              name: '',
+              email: '',
+              passwordHash: '',
+              createdAt: '',
+            },
+          };
+        }
 
         const existing = get().registeredAccounts.find((a) => a.email === email);
         if (existing) {
-          set({ currentUser: existing });
-          return { ok: true, account: existing };
+          const updated: UserAccount = {
+            ...existing,
+            avatarUrl: googleProfile.avatarUrl ?? existing.avatarUrl,
+            googleId: googleProfile.googleId ?? existing.googleId,
+          };
+          set((state) => ({
+            currentUser: updated,
+            registeredAccounts: state.registeredAccounts.map((a) =>
+              a.id === existing.id ? updated : a,
+            ),
+          }));
+          return { ok: true, account: updated };
         }
 
         const googleAccount: UserAccount = {
@@ -279,6 +302,8 @@ export const useTaskStore = create<TaskStore>()(
           passwordHash: `google-oauth-${generateId()}`,
           recoveryKeyword: 'google',
           provider: 'google',
+          avatarUrl: googleProfile.avatarUrl,
+          googleId: googleProfile.googleId,
           createdAt: new Date().toISOString(),
         };
 
@@ -300,8 +325,8 @@ export const useTaskStore = create<TaskStore>()(
         if (!normalizedKeyword) {
           return { ok: false, error: 'Informe a palavra-chave de segurança.' };
         }
-        if (newPassword.length < 4) {
-          return { ok: false, error: 'A nova senha deve ter pelo menos 4 caracteres.' };
+        if (newPassword.length < 6) {
+          return { ok: false, error: 'A nova senha deve ter pelo menos 6 caracteres.' };
         }
 
         const account = get().registeredAccounts.find((a) => a.email === normalizedEmail);
@@ -345,8 +370,8 @@ export const useTaskStore = create<TaskStore>()(
 
       resetPasswordViaEmailLink: (email, newPassword) => {
         const normalizedEmail = email.trim().toLowerCase();
-        if (newPassword.length < 4) {
-          return { ok: false, error: 'A nova senha deve ter pelo menos 4 caracteres.' };
+        if (newPassword.length < 6) {
+          return { ok: false, error: 'A nova senha deve ter pelo menos 6 caracteres.' };
         }
         const account = get().registeredAccounts.find((a) => a.email === normalizedEmail);
         if (!account) {

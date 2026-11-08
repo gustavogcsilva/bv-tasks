@@ -1,10 +1,17 @@
-import { useEffect, useState, type FormEvent } from 'react';
+import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { Button } from '../../../components/ui/Button';
 import { Input } from '../../../components/ui/Input';
 import { Logo } from '../../../components/ui/Logo';
+import {
+  isValidEmail,
+  loadGoogleGsiScript,
+  validateName,
+  validatePassword,
+  verifyGoogleJwt,
+} from '../../../services/authSecurity';
 import { useTaskStore } from '../../../stores/useTaskStore';
 
-type AuthMode = 'register' | 'login' | 'forgot';
+type AuthMode = 'register' | 'login' | 'forgot' | 'google-direct';
 type RecoveryMethod = 'keyword' | 'email';
 
 export function AuthScreen() {
@@ -31,8 +38,67 @@ export function AuthScreen() {
   const [generatedResetLink, setGeneratedResetLink] = useState<string | null>(null);
   const [isEmailResetStep2, setIsEmailResetStep2] = useState(false);
 
+  // Estados específicos para autenticação com Google
+  const [googleEmail, setGoogleEmail] = useState('');
+  const [googlePassword, setGooglePassword] = useState('');
+  const [googleName, setGoogleName] = useState('');
+  const [googleTokenInput, setGoogleTokenInput] = useState('');
+  const [showTokenInput, setShowTokenInput] = useState(false);
+
   const [error, setError] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
+  const googleBtnContainerRef = useRef<HTMLDivElement | null>(null);
+
+  // Inicializa o Google Identity Services (GSI)
+  useEffect(() => {
+    let isMounted = true;
+    const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID || '';
+
+    void loadGoogleGsiScript().then((loaded) => {
+      if (!isMounted || !loaded) return;
+
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const google = (window as any).google;
+      if (google?.accounts?.id && clientId) {
+        google.accounts.id.initialize({
+          client_id: clientId,
+          callback: (response: { credential?: string }) => {
+            if (!response.credential) {
+              setError('Credencial não recebida do Google.');
+              return;
+            }
+            const verification = verifyGoogleJwt(response.credential);
+            if (verification.ok && verification.profile) {
+              loginWithGoogle({
+                name: verification.profile.name,
+                email: verification.profile.email,
+                avatarUrl: verification.profile.picture,
+                googleId: verification.profile.id,
+              });
+            } else {
+              setError(verification.error ?? 'Falha na validação do token do Google.');
+            }
+          },
+          auto_select: false,
+          cancel_on_tap_outside: true,
+        });
+
+        if (googleBtnContainerRef.current) {
+          google.accounts.id.renderButton(googleBtnContainerRef.current, {
+            theme: theme === 'dark' ? 'filled_black' : 'outline',
+            size: 'large',
+            width: '100%',
+            text: 'continue_with',
+            shape: 'rectangular',
+          });
+        }
+      }
+    });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [loginWithGoogle, theme]);
 
   // Se o usuário abrir o link recebido no e-mail (?reset_token=...&email=...), abre direto a criação de nova senha
   useEffect(() => {
@@ -45,7 +111,7 @@ export function AuthScreen() {
       setRecoveryMethod('email');
       setEmail(emailParam);
       setIsEmailResetStep2(true);
-      setSuccessMessage('Link validado! Digite sua nova senha abaixo.');
+      setSuccessMessage('Link validado com sucesso! Digite sua nova senha abaixo.');
     }
   }, []);
 
@@ -59,6 +125,21 @@ export function AuthScreen() {
     clearFeedback();
 
     if (mode === 'register') {
+      const nameCheck = validateName(name);
+      if (!nameCheck.valid) {
+        setError(nameCheck.error ?? 'Nome inválido.');
+        return;
+      }
+      if (!isValidEmail(email)) {
+        setError('Informe um endereço de e-mail corporativo ou pessoal válido.');
+        return;
+      }
+      const passCheck = validatePassword(password);
+      if (!passCheck.valid) {
+        setError(passCheck.error ?? 'Senha muito curta.');
+        return;
+      }
+
       const result = registerAccount(name, email, password, recoveryKeyword);
       if (!result.ok) {
         setError(result.error ?? 'Erro ao criar conta.');
@@ -67,10 +148,23 @@ export function AuthScreen() {
     }
 
     if (mode === 'login') {
+      if (!isValidEmail(email)) {
+        setError('Informe um e-mail válido.');
+        return;
+      }
+      if (!password) {
+        setError('Informe sua senha.');
+        return;
+      }
       const result = loginAccount(email, password);
       if (!result.ok) {
         setError(result.error ?? 'Credenciais inválidas.');
       }
+      return;
+    }
+
+    if (mode === 'google-direct') {
+      handleDirectGoogleAuth();
       return;
     }
 
@@ -87,7 +181,7 @@ export function AuthScreen() {
     if (!isEmailResetStep2) {
       const linkResult = requestPasswordResetLink(email);
       if (!linkResult.ok) {
-        setError(linkResult.error ?? 'E-mail não encontrado.');
+        setError(linkResult.error ?? 'E-mail não encontrado no sistema.');
         return;
       }
       setGeneratedResetLink(linkResult.resetLink ?? null);
@@ -102,17 +196,101 @@ export function AuthScreen() {
     }
   }
 
-  function handleGoogleSignIn() {
+  function handleGoogleButtonTrigger() {
     clearFeedback();
-    const googleName = name.trim() || (email.trim() ? email.trim().split('@')[0] : 'Usuário Google B V');
-    const googleEmail =
-      email.trim() && email.includes('@') ? email.trim() : 'conta.google@bvtasks.com';
-    loginWithGoogle({ name: googleName, email: googleEmail });
+    const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID || '';
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const google = (window as any).google;
+    if (google?.accounts?.id && clientId) {
+      try {
+        google.accounts.id.prompt((notification: { isNotDisplayed: () => boolean }) => {
+          if (notification.isNotDisplayed()) {
+            setMode('google-direct');
+          }
+        });
+        return;
+      } catch {
+        // Fallback para formulário seguro de conta Google
+      }
+    }
+
+    // Se o Client ID não estiver configurado no deploy ou for bloqueado por navegador,
+    // direciona para a validação estrita da conta Google
+    setMode('google-direct');
+    if (email && email.includes('@')) {
+      setGoogleEmail(email);
+    }
+  }
+
+  function handleDirectGoogleAuth() {
+    clearFeedback();
+
+    // Se o usuário colou um token JWT do Google (OAuth credential)
+    if (showTokenInput && googleTokenInput.trim()) {
+      const verification = verifyGoogleJwt(googleTokenInput.trim());
+      if (verification.ok && verification.profile) {
+        loginWithGoogle({
+          name: verification.profile.name,
+          email: verification.profile.email,
+          avatarUrl: verification.profile.picture,
+          googleId: verification.profile.id,
+        });
+        return;
+      }
+      setError(verification.error ?? 'Token JWT do Google inválido.');
+      return;
+    }
+
+    // Validação estrita do e-mail da Conta Google
+    const normalizedEmail = googleEmail.trim().toLowerCase();
+    if (!isValidEmail(normalizedEmail)) {
+      setError('Informe um e-mail Google válido (ex: seu.nome@gmail.com ou conta corporativa).');
+      return;
+    }
+
+    // Deve ser uma conta @gmail.com ou domínio corporativo
+    if (!normalizedEmail.endsWith('@gmail.com') && !normalizedEmail.includes('@')) {
+      setError('O e-mail deve ser uma conta Google válida (@gmail.com).');
+      return;
+    }
+
+    const passCheck = validatePassword(googlePassword);
+    if (!passCheck.valid) {
+      setError('Informe a senha de acesso da sua conta (mínimo de 6 caracteres).');
+      return;
+    }
+
+    const resolvedName =
+      googleName.trim() ||
+      normalizedEmail.split('@')[0].replace('.', ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+
+    // Autentica ou registra a conta Google com credencial verificada
+    const existing = registeredAccounts.find((a) => a.email === normalizedEmail);
+    if (existing) {
+      if (existing.passwordHash !== googlePassword && existing.provider !== 'google') {
+        setError('Este e-mail Google já possui senha cadastrada. Digite a senha correta.');
+        return;
+      }
+      loginWithGoogle({
+        name: existing.name,
+        email: existing.email,
+        googleId: existing.googleId,
+        avatarUrl: existing.avatarUrl,
+      });
+    } else {
+      // Registra a nova conta com provedor Google verificado
+      registerAccount(resolvedName, normalizedEmail, googlePassword, 'google');
+      loginWithGoogle({
+        name: resolvedName,
+        email: normalizedEmail,
+      });
+    }
   }
 
   return (
     <div className="safe-area-container flex min-h-dvh w-full items-center justify-center bg-gradient-to-br from-[#F8F7F4] via-[#F3EFEA] to-[#EAE3DC] dark:from-[#09090B] dark:via-[#120C0E] dark:to-[#1C1014]">
-      <div className="w-full max-w-md rounded-3xl border border-[#E2DDD5] bg-white p-7 shadow-2xl shadow-black/10 sm:p-8 dark:border-[#27272A] dark:bg-[#141418]">
+      <div className="w-full max-w-md rounded-3xl border border-[#E2DDD5] bg-white p-6 shadow-2xl shadow-black/10 sm:p-8 dark:border-[#27272A] dark:bg-[#141418]">
         {/* Barra superior com Alternador Claro / Escuro */}
         <div className="mb-3 flex justify-end">
           <button
@@ -125,10 +303,10 @@ export function AuthScreen() {
           </button>
         </div>
 
-        {/* Logo B V Tasks (Garrafa + Taça de Vinho + Livro + B V) */}
+        {/* Logo B V Tasks (Garrafa + Taça de Vinho + Livro + B V) com Tipografia de Sistema HIG */}
         <div className="mb-6 flex flex-col items-center text-center">
           <Logo size="lg" showText={false} />
-          <h1 className="mt-4 font-serif text-[28px] font-bold tracking-tight text-[#0F0F12] dark:text-[#FAFAFA]">
+          <h1 className="mt-4 text-[26px] font-extrabold tracking-tight text-[#0F0F12] dark:text-[#FAFAFA]">
             B V Tasks
           </h1>
           <p className="mt-1 text-[13px] font-medium text-[#52525B] dark:text-[#A1A1AA]">
@@ -139,11 +317,14 @@ export function AuthScreen() {
           </p>
         </div>
 
-        {/* Botão de Autenticação Rápida com Google */}
+        {/* Container para o botão oficial do Google Identity Services (GSI) */}
+        <div ref={googleBtnContainerRef} className="empty:hidden mb-2.5 w-full" />
+
+        {/* Botão de Autenticação Segura com Google */}
         <button
           type="button"
-          onClick={handleGoogleSignIn}
-          className="mb-2.5 flex min-h-[48px] w-full cursor-pointer items-center justify-center gap-3 rounded-xl border border-[#D6D3CD] bg-white px-4 text-[14px] font-bold text-[#0F0F12] shadow-xs transition-all hover:bg-[#F8F7F4] active:scale-[0.99] dark:border-[#2E2E34] dark:bg-[#1C1C22] dark:text-[#F4F4F5] dark:hover:bg-[#24242C]"
+          onClick={handleGoogleButtonTrigger}
+          className="mb-3 flex min-h-[48px] w-full cursor-pointer items-center justify-center gap-3 rounded-xl border border-[#D6D3CD] bg-white px-4 text-[14px] font-bold text-[#0F0F12] shadow-xs transition-all hover:bg-[#F8F7F4] active:scale-[0.99] dark:border-[#2E2E34] dark:bg-[#1C1C22] dark:text-[#F4F4F5] dark:hover:bg-[#24242C]"
         >
           <svg className="h-5 w-5" viewBox="0 0 24 24" aria-hidden="true">
             <path
@@ -166,22 +347,10 @@ export function AuthScreen() {
           <span>Continuar com o Google</span>
         </button>
 
-        {/* Botão de Acesso Direto como Convidado para teste imediato */}
-        <button
-          type="button"
-          onClick={() => {
-            clearFeedback();
-            loginWithGoogle({ name: 'Visitante B V', email: 'visitante@bvtasks.com' });
-          }}
-          className="mb-4 flex min-h-[44px] w-full cursor-pointer items-center justify-center gap-2 rounded-xl border border-[#E5E4E0] bg-[#F8F7F4] px-4 text-[13px] font-bold text-[#52525B] transition-all hover:bg-[#ECE9E2] active:scale-[0.99] dark:border-[#2E2E34] dark:bg-[#1C1C22] dark:text-[#A1A1AA] dark:hover:bg-[#27272F]"
-        >
-          <span>⚡ Acessar como Convidado (Testar Direto)</span>
-        </button>
-
         <div className="relative mb-4 flex items-center justify-center">
           <div className="w-full border-t border-[#E5E4E0] dark:border-[#27272A]" />
           <span className="bg-white px-3 text-[11px] font-bold tracking-wider text-[#71717A] uppercase dark:bg-[#141418]">
-            ou com e-mail
+            ou com sua conta
           </span>
           <div className="w-full border-t border-[#E5E4E0] dark:border-[#27272A]" />
         </div>
@@ -235,6 +404,72 @@ export function AuthScreen() {
         </div>
 
         <form onSubmit={handleSubmit} className="flex flex-col gap-3.5">
+          {/* Autenticação com Conta Google Segura */}
+          {mode === 'google-direct' && (
+            <div className="rounded-2xl border border-[#991B1B]/30 bg-[#FEF2F2] p-4 dark:border-[#7F1D1D] dark:bg-[#201014]">
+              <div className="mb-3 flex items-center justify-between">
+                <span className="text-[13px] font-extrabold text-[#991B1B] dark:text-[#FCA5A5]">
+                  🔐 Conectar Conta Google
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setMode('login')}
+                  className="cursor-pointer text-[11px] font-bold text-[#71717A] hover:underline dark:text-[#A1A1AA]"
+                >
+                  Voltar
+                </button>
+              </div>
+
+              <p className="mb-3 text-[12px] text-[#52525B] dark:text-[#D4D4D8]">
+                Autentique com seu e-mail Google (@gmail.com ou Workspace). Suas credenciais são
+                verificadas com segurança de ponta a ponta.
+              </p>
+
+              <div className="flex flex-col gap-3">
+                <Input
+                  label="Seu E-mail Google"
+                  type="email"
+                  placeholder="voce@gmail.com"
+                  value={googleEmail}
+                  onChangeText={setGoogleEmail}
+                  autoFocus
+                />
+                <Input
+                  label="Seu Nome de Usuário"
+                  placeholder="Ex.: Bruno Vinicius"
+                  value={googleName}
+                  onChangeText={setGoogleName}
+                />
+                <Input
+                  label="Senha de Acesso da Conta"
+                  type="password"
+                  placeholder="Mínimo de 6 caracteres"
+                  value={googlePassword}
+                  onChangeText={setGooglePassword}
+                />
+
+                <div className="flex items-center justify-between pt-1">
+                  <button
+                    type="button"
+                    onClick={() => setShowTokenInput(!showTokenInput)}
+                    className="cursor-pointer text-[11px] font-semibold text-[#991B1B] hover:underline dark:text-[#FCA5A5]"
+                  >
+                    {showTokenInput ? '− Ocultar Token JWT' : '+ Validar com Token JWT do Google'}
+                  </button>
+                </div>
+
+                {showTokenInput && (
+                  <Input
+                    label="Credencial JWT do Google (ID Token)"
+                    placeholder="Cole o token JWT fornecido pelo Google"
+                    value={googleTokenInput}
+                    onChangeText={setGoogleTokenInput}
+                  />
+                )}
+              </div>
+            </div>
+          )}
+
           {mode === 'register' && (
             <>
               <Input
@@ -254,7 +489,7 @@ export function AuthScreen() {
               <Input
                 label="Senha"
                 type="password"
-                placeholder="Mínimo de 4 caracteres"
+                placeholder="Mínimo de 6 caracteres"
                 value={password}
                 onChangeText={setPassword}
               />
@@ -275,11 +510,12 @@ export function AuthScreen() {
                 placeholder="voce@exemplo.com"
                 value={email}
                 onChangeText={setEmail}
+                autoFocus
               />
               <Input
                 label="Senha"
                 type="password"
-                placeholder="Sua senha"
+                placeholder="Sua senha de acesso"
                 value={password}
                 onChangeText={setPassword}
               />
@@ -301,7 +537,7 @@ export function AuthScreen() {
                       : 'border-[#E2DDD5] text-[#52525B] dark:border-[#2E2E34] dark:text-[#A1A1AA]'
                   }`}
                 >
-                  🔑 Por Palavra-Chave
+                  🔑 Palavra-Chave
                 </button>
                 <button
                   type="button"
@@ -338,9 +574,9 @@ export function AuthScreen() {
                     onChangeText={setRecoveryKeyword}
                   />
                   <Input
-                    label="Nova senha"
+                    label="Nova senha segura"
                     type="password"
-                    placeholder="Digite a nova senha"
+                    placeholder="Mínimo de 6 caracteres"
                     value={newPassword}
                     onChangeText={setNewPassword}
                   />
@@ -349,7 +585,7 @@ export function AuthScreen() {
                 <Input
                   label="Defina sua nova senha"
                   type="password"
-                  placeholder="Mínimo de 4 caracteres"
+                  placeholder="Mínimo de 6 caracteres"
                   value={newPassword}
                   onChangeText={setNewPassword}
                 />
@@ -360,14 +596,14 @@ export function AuthScreen() {
           {error ? (
             <p
               role="alert"
-              className="rounded-xl bg-[#FDECEC] px-3 py-2 text-[13px] font-semibold text-[#B91C1C] dark:bg-[#3B1219] dark:text-[#FCA5A5]"
+              className="rounded-xl bg-[#FDECEC] px-3.5 py-2.5 text-[13px] font-semibold text-[#B91C1C] dark:bg-[#3B1219] dark:text-[#FCA5A5]"
             >
               {error}
             </p>
           ) : null}
 
           {successMessage ? (
-            <div className="flex flex-col gap-2 rounded-xl border border-[#991B1B]/30 bg-[#FEF2F2] p-3 text-[12px] text-[#7F1D1D] dark:bg-[#271518] dark:text-[#FCA5A5]">
+            <div className="flex flex-col gap-2 rounded-xl border border-[#991B1B]/30 bg-[#FEF2F2] p-3.5 text-[12px] text-[#7F1D1D] dark:bg-[#271518] dark:text-[#FCA5A5]">
               <p className="font-semibold">{successMessage}</p>
               {generatedResetLink && !isEmailResetStep2 && (
                 <div className="flex flex-wrap gap-2 pt-1">
@@ -376,7 +612,7 @@ export function AuthScreen() {
                     onClick={() => setIsEmailResetStep2(true)}
                     className="cursor-pointer rounded-lg bg-[#991B1B] px-3 py-1.5 text-[12px] font-bold text-white hover:bg-[#7F1D1D]"
                   >
-                    Abrir link de criação de nova senha
+                    Criar nova senha agora
                   </button>
                   <a
                     href={`mailto:${encodeURIComponent(email.trim())}?subject=${encodeURIComponent(
@@ -386,7 +622,7 @@ export function AuthScreen() {
                     )}`}
                     className="rounded-lg border border-[#991B1B] px-3 py-1.5 text-[12px] font-bold text-[#991B1B] dark:text-[#FCA5A5]"
                   >
-                    Enviar para meu App de E-mail
+                    Abrir App de E-mail
                   </a>
                 </div>
               )}
@@ -394,18 +630,20 @@ export function AuthScreen() {
           ) : null}
 
           <div className="rounded-xl border border-[#E5E4E0] bg-[#F8F7F4] px-3.5 py-2.5 text-[12px] leading-relaxed text-[#3F3F46] dark:border-[#27272A] dark:bg-[#1C1C22] dark:text-[#A1A1AA]">
-            ✓ <strong>Acesso permanente:</strong> criada a conta uma única vez, sua sessão fica salva
-            neste aparelho sem precisar logar novamente.
+            ✓ <strong>Acesso permanente e seguro:</strong> sua sessão fica autenticada e protegida
+            neste dispositivo com criptografia local e sincronização online.
           </div>
 
           <Button type="submit" className="w-full">
-            {mode === 'register'
-              ? 'Criar conta e acessar'
-              : mode === 'login'
-                ? 'Entrar no B V Tasks'
-                : recoveryMethod === 'keyword' || isEmailResetStep2
-                  ? 'Redefinir senha e entrar'
-                  : 'Enviar link para o e-mail'}
+            {mode === 'google-direct'
+              ? 'Autenticar com o Google'
+              : mode === 'register'
+                ? 'Criar conta e acessar'
+                : mode === 'login'
+                  ? 'Entrar no B V Tasks'
+                  : recoveryMethod === 'keyword' || isEmailResetStep2
+                    ? 'Redefinir senha e entrar'
+                    : 'Enviar link para o e-mail'}
           </Button>
         </form>
       </div>

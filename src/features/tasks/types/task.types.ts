@@ -45,6 +45,8 @@ export interface UserAccount {
   passwordHash: string;
   recoveryKeyword?: string;
   provider?: 'email' | 'google';
+  avatarUrl?: string;
+  googleId?: string;
   createdAt: string;
 }
 

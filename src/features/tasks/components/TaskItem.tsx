@@ -29,6 +29,7 @@ const priorityLabels = {
 interface TaskItemProps {
   task: Task;
   folder?: TaskFolder;
+  isRecentlyCreated?: boolean;
   onToggle: () => void;
   onDelete: () => void;
   onAddAttachment?: (attachment: TaskAttachment) => void;
@@ -38,6 +39,7 @@ interface TaskItemProps {
 export function TaskItem({
   task,
   folder,
+  isRecentlyCreated,
   onToggle,
   onDelete,
   onAddAttachment,
@@ -83,8 +85,12 @@ export function TaskItem({
 
   return (
     <Card
-      className={`flex min-h-[150px] overflow-hidden ${
+      className={`flex min-h-[150px] overflow-hidden transition-all duration-300 ${
         task.isCompleted ? 'opacity-70' : ''
+      } ${
+        isRecentlyCreated
+          ? 'animate-task-enter ring-2 ring-[#991B1B] shadow-lg shadow-[#991B1B]/20 animate-highlight-pulse'
+          : ''
       }`}
     >
       {/* Barra lateral na cor do Escopo (Trabalho: Vinho, Pessoal: Azul, Estudo: Rosa) */}

@@ -12,13 +12,16 @@
       content="B V Tasks — Planejamento Executivo com Calendário, Pastas, Câmera/PDFs, Notificações e Sincronização Mobile."
     />
 
-    <!-- Tipografia Profissional (Plus Jakarta Sans & Playfair Display) com fallback de sistema -->
+    <!-- Tipografia Executiva Padrão Apple HIG & Inter com fallback nativo de sistema -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
-      href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap"
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"
       rel="stylesheet"
     />
+
+    <!-- Google Identity Services (GSI) para Autenticação Segura -->
+    <script src="https://accounts.google.com/gsi/client" async defer id="google-gsi-client"></script>
 
     <!-- PWA & Theme (Vermelho Vinho e Preto) -->
     <meta name="theme-color" content="#7F1D1D" media="(prefers-color-scheme: light)" />
@@ -39,7 +42,7 @@
     <!-- Script de Autocura e Proteção contra Tela Branca / Cache Legado -->
     <script>
       (function() {
-        var APP_VERSION = 'bv-tasks-v5';
+        var APP_VERSION = 'bv-tasks-v6';
         try {
           var storedVersion = localStorage.getItem('__bv_tasks_cache_version__');
           if (storedVersion !== APP_VERSION) {
