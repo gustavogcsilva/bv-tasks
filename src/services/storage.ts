@@ -5,17 +5,24 @@ import type { TaskAttachment } from '../features/tasks/types/task.types';
  * Fallback em memória caso o localStorage esteja indisponível ou atinja limite de cota.
  */
 const memoryFallback = new Map<string, string>();
+let cachedStorageAvailable: boolean | null = null;
 
 function isLocalStorageAvailable(): boolean {
+  if (cachedStorageAvailable !== null) {
+    return cachedStorageAvailable;
+  }
   try {
     if (typeof window === 'undefined' || !window.localStorage) {
+      cachedStorageAvailable = false;
       return false;
     }
     const testKey = '__bv_tasks_storage_test__';
     window.localStorage.setItem(testKey, '1');
     window.localStorage.removeItem(testKey);
+    cachedStorageAvailable = true;
     return true;
   } catch {
+    cachedStorageAvailable = false;
     return false;
   }
 }

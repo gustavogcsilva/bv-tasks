@@ -143,7 +143,7 @@ export function AuthScreen() {
         <button
           type="button"
           onClick={handleGoogleSignIn}
-          className="mb-4 flex min-h-[48px] w-full cursor-pointer items-center justify-center gap-3 rounded-xl border border-[#D6D3CD] bg-white px-4 text-[14px] font-bold text-[#0F0F12] shadow-xs transition-all hover:bg-[#F8F7F4] active:scale-[0.99] dark:border-[#2E2E34] dark:bg-[#1C1C22] dark:text-[#F4F4F5] dark:hover:bg-[#24242C]"
+          className="mb-2.5 flex min-h-[48px] w-full cursor-pointer items-center justify-center gap-3 rounded-xl border border-[#D6D3CD] bg-white px-4 text-[14px] font-bold text-[#0F0F12] shadow-xs transition-all hover:bg-[#F8F7F4] active:scale-[0.99] dark:border-[#2E2E34] dark:bg-[#1C1C22] dark:text-[#F4F4F5] dark:hover:bg-[#24242C]"
         >
           <svg className="h-5 w-5" viewBox="0 0 24 24" aria-hidden="true">
             <path
@@ -164,6 +164,18 @@ export function AuthScreen() {
             />
           </svg>
           <span>Continuar com o Google</span>
+        </button>
+
+        {/* Botão de Acesso Direto como Convidado para teste imediato */}
+        <button
+          type="button"
+          onClick={() => {
+            clearFeedback();
+            loginWithGoogle({ name: 'Visitante B V', email: 'visitante@bvtasks.com' });
+          }}
+          className="mb-4 flex min-h-[44px] w-full cursor-pointer items-center justify-center gap-2 rounded-xl border border-[#E5E4E0] bg-[#F8F7F4] px-4 text-[13px] font-bold text-[#52525B] transition-all hover:bg-[#ECE9E2] active:scale-[0.99] dark:border-[#2E2E34] dark:bg-[#1C1C22] dark:text-[#A1A1AA] dark:hover:bg-[#27272F]"
+        >
+          <span>⚡ Acessar como Convidado (Testar Direto)</span>
         </button>
 
         <div className="relative mb-4 flex items-center justify-center">

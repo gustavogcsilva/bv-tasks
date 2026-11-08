@@ -9,17 +9,23 @@ export function registerServiceWorker(): void {
     return;
   }
 
-  window.addEventListener('load', () => {
+  const register = () => {
     navigator.serviceWorker
       .register('/sw.js', { scope: '/' })
       .then((registration) => {
+        // Força busca imediata de atualizações do Service Worker
+        try {
+          registration.update();
+        } catch {
+          // Ignora erro se offline
+        }
+
         registration.addEventListener('updatefound', () => {
           const installingWorker = registration.installing;
           if (!installingWorker) return;
 
           installingWorker.addEventListener('statechange', () => {
             if (installingWorker.state === 'installed' && navigator.serviceWorker.controller) {
-              // Nova versão em cache pronta para uso na próxima abertura
               installingWorker.postMessage({ type: 'SKIP_WAITING' });
             }
           });
@@ -28,7 +34,22 @@ export function registerServiceWorker(): void {
       .catch((error) => {
         console.warn('[PWA] Falha ao registrar Service Worker:', error);
       });
+  };
+
+  // Garante que a página recarregue automaticamente quando a nova versão for ativada
+  let refreshing = false;
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (!refreshing) {
+      refreshing = true;
+      window.location.reload();
+    }
   });
+
+  if (document.readyState === 'complete') {
+    register();
+  } else {
+    window.addEventListener('load', register);
+  }
 }
 
 /**

@@ -35,6 +35,52 @@
     <!-- Ícones para iOS, Android e Navegadores -->
     <link rel="icon" type="image/svg+xml" href="/icon.svg" />
     <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
+
+    <!-- Script de Autocura e Proteção contra Tela Branca / Cache Legado -->
+    <script>
+      (function() {
+        var APP_VERSION = 'bv-tasks-v5';
+        try {
+          var storedVersion = localStorage.getItem('__bv_tasks_cache_version__');
+          if (storedVersion !== APP_VERSION) {
+            localStorage.setItem('__bv_tasks_cache_version__', APP_VERSION);
+            if ('caches' in window) {
+              caches.keys().then(function(cacheNames) {
+                cacheNames.forEach(function(name) {
+                  if (name.indexOf(APP_VERSION) === -1) {
+                    caches.delete(name);
+                  }
+                });
+              });
+            }
+          }
+        } catch (e) {}
+
+        // Failsafe de tela branca: se após 3s o aplicativo não renderizou nada
+        window.addEventListener('DOMContentLoaded', function() {
+          setTimeout(function() {
+            var rootEl = document.getElementById('root');
+            if (rootEl && rootEl.childElementCount === 0) {
+              console.warn('[B V Tasks] Detectado root vazio. Limpando Service Workers e recarregando...');
+              if ('serviceWorker' in navigator) {
+                navigator.serviceWorker.getRegistrations().then(function(regs) {
+                  regs.forEach(function(r) { r.unregister(); });
+                });
+              }
+              if ('caches' in window) {
+                caches.keys().then(function(names) {
+                  names.forEach(function(n) { caches.delete(n); });
+                });
+              }
+              if (!sessionStorage.getItem('__bv_tasks_failsafe_reloaded__')) {
+                sessionStorage.setItem('__bv_tasks_failsafe_reloaded__', '1');
+                window.location.reload();
+              }
+            }
+          }, 3000);
+        });
+      })();
+    </script>
   </head>
   <body class="bg-[#F8F7F4] text-[#0F0F12] antialiased selection:bg-[#991B1B]/20 dark:bg-[#09090B] dark:text-[#F4F4F5]">
     <div id="root"></div>
