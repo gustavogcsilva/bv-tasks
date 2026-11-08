@@ -118,7 +118,7 @@ export function AuthScreen() {
     setSuccessMessage('');
   }
 
-  function handleSubmit(event: FormEvent) {
+  async function handleSubmit(event: FormEvent) {
     event.preventDefault();
     clearFeedback();
 
@@ -138,7 +138,7 @@ export function AuthScreen() {
         return;
       }
 
-      const result = registerAccount(name, email, password, recoveryKeyword);
+      const result = await registerAccount(name, email, password, recoveryKeyword);
       if (!result.ok) {
         setError(result.error ?? 'Erro ao criar conta.');
       }
@@ -154,7 +154,7 @@ export function AuthScreen() {
         setError('Informe sua senha.');
         return;
       }
-      const result = loginAccount(email, password);
+      const result = await loginAccount(email, password);
       if (!result.ok) {
         setError(result.error ?? 'Credenciais inválidas.');
       }
@@ -162,13 +162,13 @@ export function AuthScreen() {
     }
 
     if (mode === 'google-direct') {
-      handleDirectGoogleAuth();
+      await handleDirectGoogleAuth();
       return;
     }
 
     // Modo Recuperação de Senha (forgot)
     if (recoveryMethod === 'keyword') {
-      const result = resetPasswordWithKeyword(email, recoveryKeyword, newPassword);
+      const result = await resetPasswordWithKeyword(email, recoveryKeyword, newPassword);
       if (!result.ok) {
         setError(result.error ?? 'Não foi possível redefinir a senha.');
       }
@@ -187,7 +187,7 @@ export function AuthScreen() {
         `Link de redefinição enviado para ${email.trim()}. Clique no link abaixo para criar sua nova senha.`,
       );
     } else {
-      const resetRes = resetPasswordViaEmailLink(email, newPassword);
+      const resetRes = await resetPasswordViaEmailLink(email, newPassword);
       if (!resetRes.ok) {
         setError(resetRes.error ?? 'Erro ao salvar nova senha.');
       }
@@ -221,7 +221,7 @@ export function AuthScreen() {
     }
   }
 
-  function handleDirectGoogleAuth() {
+  async function handleDirectGoogleAuth() {
     clearFeedback();
 
     const normalizedEmail = googleEmail.trim().toLowerCase();
@@ -245,25 +245,14 @@ export function AuthScreen() {
       googleName.trim() ||
       normalizedEmail.split('@')[0].replace('.', ' ').replace(/\b\w/g, (c) => c.toUpperCase());
 
-    // Se já houver conta cadastrada com esse e-mail Google, valida a senha
-    const existing = registeredAccounts.find((a) => a.email === normalizedEmail);
-    if (existing) {
-      if (existing.passwordHash !== googlePassword && existing.provider !== 'google') {
-        setError('Senha incorreta para esta conta Google cadastrada.');
-        return;
-      }
-      loginWithGoogle({
-        name: existing.name,
-        email: existing.email,
-        googleId: existing.googleId,
-        avatarUrl: existing.avatarUrl,
-      });
-    } else {
-      // Registra e autentica diretamente como conta Google verificada
-      loginWithGoogle({
-        name: resolvedName,
-        email: normalizedEmail,
-      });
+    const result = await loginWithGoogle({
+      name: resolvedName,
+      email: normalizedEmail,
+      password: googlePassword.trim(),
+    });
+
+    if (!result.ok) {
+      setError('Senha incorreta para esta conta Google cadastrada.');
     }
   }
 

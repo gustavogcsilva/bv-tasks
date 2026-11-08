@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, within } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it } from 'vitest';
 import App from '../App';
 import { useTaskStore } from '../stores/useTaskStore';
@@ -25,7 +25,7 @@ describe('Integração da Interface B V Tasks PWA (Vinho & Preto, Claro/Escuro, 
     });
   });
 
-  it('deve exibir a tela de autenticação com opção Google, Criar Conta e Esqueci a Senha, e entrar no app', () => {
+  it('deve exibir a tela de autenticação com opção Google, Criar Conta e Esqueci a Senha, e entrar no app', async () => {
     render(<App />);
 
     expect(screen.getByText('B V Tasks')).toBeInTheDocument();
@@ -50,7 +50,9 @@ describe('Integração da Interface B V Tasks PWA (Vinho & Preto, Claro/Escuro, 
 
     fireEvent.click(screen.getByRole('button', { name: 'Criar conta e acessar' }));
 
-    expect(screen.getByText('Tudo em dia')).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getByText('Tudo em dia')).toBeInTheDocument();
+    });
     expect(screen.getByText('Trabalho (Vinho)')).toBeInTheDocument();
     expect(screen.getByText('Pessoal (Azul)')).toBeInTheDocument();
     expect(screen.getByText('Estudo (Rosa)')).toBeInTheDocument();

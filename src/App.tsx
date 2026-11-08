@@ -43,6 +43,7 @@ export function BVTasksApp() {
   const toggleTheme = useTaskStore((state) => state.toggleTheme);
   const currentUser = useTaskStore((state) => state.currentUser);
   const logoutAccount = useTaskStore((state) => state.logoutAccount);
+  const syncWithDatabase = useTaskStore((state) => state.syncWithDatabase);
 
   const tasks = useTaskStore((state) => state.tasks);
   const folders = useTaskStore((state) => state.folders);
@@ -88,12 +89,20 @@ export function BVTasksApp() {
     }
   }, [theme]);
 
-  // Monitoramento de conectividade para avisos e sincronização móvel automática
+  // Sincroniza com o banco de dados central (cross-device) ao logar ou abrir a aplicação
+  useEffect(() => {
+    if (currentUser) {
+      void syncWithDatabase();
+    }
+  }, [currentUser, syncWithDatabase]);
+
+  // Monitoramento de conectividade para avisos e sincronização automática
   useEffect(() => {
     if (typeof window === 'undefined') return;
 
     const handleOnline = () => {
-      showToast('🌐 Conexão restabelecida: Todas as tarefas sincronizadas!', 'success');
+      showToast('🌐 Conexão restabelecida: Sincronizando com o banco de dados...', 'success');
+      void syncWithDatabase();
       setLastSyncTime(format(new Date(), 'HH:mm'));
       if ('vibrate' in navigator) {
         navigator.vibrate?.([30, 40, 30]);
@@ -172,16 +181,15 @@ export function BVTasksApp() {
     }
   }
 
-  function handleManualSync() {
+  async function handleManualSync() {
     setIsSyncing(true);
-    setTimeout(() => {
-      setIsSyncing(false);
-      setLastSyncTime(format(new Date(), 'HH:mm'));
-      showToast('✅ Dados verificados e sincronizados com segurança!', 'success');
-      if ('vibrate' in navigator) {
-        navigator.vibrate?.([20, 30, 20]);
-      }
-    }, 600);
+    await syncWithDatabase();
+    setIsSyncing(false);
+    setLastSyncTime(format(new Date(), 'HH:mm'));
+    showToast('✅ Sincronizado com o banco de dados central!', 'success');
+    if ('vibrate' in navigator) {
+      navigator.vibrate?.([20, 30, 20]);
+    }
   }
 
   // Clicando na tarefa importante da Barra de Menu: navega diretamente para a data e rola até ela
@@ -273,24 +281,27 @@ export function BVTasksApp() {
         </div>
       )}
 
-      {/* Drawer Mobile da Barra de Menu Lateral */}
+      {/* Drawer da Barra de Menu Lateral (Idêntico e Funcional no Celular e Computador) */}
       {isMobileMenuOpen && (
         <div
           role="dialog"
           aria-modal="true"
           aria-label="Menu Lateral do Usuário e Tarefas Importantes"
-          className="animate-modal-backdrop fixed inset-0 z-50 flex bg-black/60 backdrop-blur-xs lg:hidden"
+          className="animate-modal-backdrop fixed inset-0 z-50 flex bg-black/60 backdrop-blur-xs"
         >
           <div
             aria-hidden="true"
             onClick={() => setIsMobileMenuOpen(false)}
             className="fixed inset-0"
           />
-          <div className="animate-modal-content safe-area-container relative z-10 flex h-full w-[88vw] max-w-[360px] flex-col overflow-y-auto bg-[#F8F7F4] p-4 shadow-2xl dark:bg-[#09090B]">
+          <div className="animate-modal-content safe-area-container relative z-10 flex h-full w-[88vw] max-w-[380px] flex-col overflow-y-auto bg-[#F8F7F4] p-4 shadow-2xl dark:bg-[#09090B]">
             <LeftMenuBar
               currentUser={currentUser}
               tasks={tasks}
-              onLogout={logoutAccount}
+              onLogout={() => {
+                setIsMobileMenuOpen(false);
+                logoutAccount();
+              }}
               onSelectTask={handleSelectImportantTask}
               isMobileDrawer={true}
               onCloseMobileDrawer={() => setIsMobileMenuOpen(false)}
@@ -309,18 +320,26 @@ export function BVTasksApp() {
           <div className="flex items-center gap-2.5">
             <Logo size="md" showText />
 
-            {/* Botão de Menu & Perfil Mobile (para abrir barra lateral no celular) */}
+            {/* Botão de Menu & Perfil (Idêntico no Celular e Computador) */}
             <button
               type="button"
               onClick={() => setIsMobileMenuOpen(true)}
               aria-label="Abrir Menu e Tarefas Importantes"
-              className="flex h-[40px] cursor-pointer items-center gap-2 rounded-xl border border-[#991B1B]/30 bg-white px-2.5 text-[12px] font-bold text-[#0F0F12] shadow-xs lg:hidden dark:border-[#7F1D1D] dark:bg-[#1C1C22] dark:text-[#FAFAFA]"
+              className="flex h-[40px] cursor-pointer items-center gap-2 rounded-xl border border-[#991B1B]/30 bg-white px-2.5 text-[12px] font-bold text-[#0F0F12] shadow-xs transition-all hover:border-[#991B1B] hover:shadow-md active:scale-95 dark:border-[#7F1D1D] dark:bg-[#1C1C22] dark:text-[#FAFAFA]"
             >
               <span className="text-[14px]">☰</span>
-              <span className="flex h-5 w-5 items-center justify-center rounded-full bg-[#991B1B] text-[10px] text-white">
-                {currentUser.name.charAt(0).toUpperCase()}
-              </span>
-              <span className="max-w-[75px] truncate sm:max-w-[120px]">{currentUser.name}</span>
+              {currentUser.avatarUrl ? (
+                <img
+                  src={currentUser.avatarUrl}
+                  alt={currentUser.name}
+                  className="h-5 w-5 rounded-full object-cover"
+                />
+              ) : (
+                <span className="flex h-5 w-5 items-center justify-center rounded-full bg-[#991B1B] text-[10px] text-white">
+                  {currentUser.name.charAt(0).toUpperCase()}
+                </span>
+              )}
+              <span className="max-w-[85px] truncate sm:max-w-[140px]">{currentUser.name}</span>
               {highPriorityCount > 0 && (
                 <span className="rounded-full bg-[#DC2626] px-1.5 py-0.5 text-[9px] font-black text-white">
                   ⭐ {highPriorityCount}
@@ -365,32 +384,6 @@ export function BVTasksApp() {
                 🔔 Alertas
               </button>
             )}
-
-            {/* Perfil do Usuário Autenticado (no Desktop) */}
-            <div className="hidden items-center gap-2 rounded-xl border border-[#E5E4E0] bg-white px-3 py-1.5 lg:flex dark:border-[#27272A] dark:bg-[#141418]">
-              {currentUser.avatarUrl ? (
-                <img
-                  src={currentUser.avatarUrl}
-                  alt={currentUser.name}
-                  className="h-6 w-6 rounded-full object-cover"
-                />
-              ) : (
-                <span className="flex h-6 w-6 items-center justify-center rounded-full bg-[#991B1B] text-[11px] font-extrabold text-white">
-                  {currentUser.name.charAt(0).toUpperCase()}
-                </span>
-              )}
-              <span className="max-w-[140px] truncate text-[12px] font-bold text-[#0F0F12] dark:text-[#FAFAFA]">
-                {currentUser.name}
-              </span>
-              <button
-                type="button"
-                onClick={logoutAccount}
-                title="Sair ou trocar de conta"
-                className="ml-1 cursor-pointer text-[11px] font-semibold text-[#71717A] hover:text-[#B91C1C] dark:text-[#A1A1AA]"
-              >
-                Sair
-              </button>
-            </div>
 
             <button
               type="button"

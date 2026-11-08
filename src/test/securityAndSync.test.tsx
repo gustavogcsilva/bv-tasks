@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it } from 'vitest';
 import App from '../App';
 import {
@@ -102,7 +102,7 @@ describe('Engenharia de Segurança — Validação de Tokens Google e Proteção
     expect(screen.queryByText(/Testar Direto/i)).not.toBeInTheDocument();
   });
 
-  it('deve autenticar com a Conta Google como se fosse entrar no e-mail (com e-mail e senha, sem exigir JWT)', () => {
+  it('deve autenticar com a Conta Google como se fosse entrar no e-mail (com e-mail e senha, sem exigir JWT)', async () => {
     window.localStorage.clear();
     useTaskStore.setState({ currentUser: null, registeredAccounts: [] });
 
@@ -125,7 +125,9 @@ describe('Engenharia de Segurança — Validação de Tokens Google e Proteção
     fireEvent.click(screen.getByRole('button', { name: 'Autenticar com o Google' }));
 
     // Confirma que entrou com a conta Google autenticada
-    expect(useTaskStore.getState().currentUser?.email).toBe('gestor.executivo@gmail.com');
+    await waitFor(() => {
+      expect(useTaskStore.getState().currentUser?.email).toBe('gestor.executivo@gmail.com');
+    });
     expect(useTaskStore.getState().currentUser?.provider).toBe('google');
   });
 });
@@ -222,6 +224,40 @@ describe('Barra de Menu Lateral (Quem está logado, Mini Status Bar e Tarefas Im
     // Fecha a gaveta
     fireEvent.click(screen.getByRole('button', { name: 'Fechar menu' }));
     expect(screen.queryByRole('dialog', { name: /Menu Lateral do Usuário/i })).not.toBeInTheDocument();
+  });
+
+  it('o botão de menu deve ser responsivo e não possuir classe que o oculte no computador (lg:hidden)', () => {
+    render(<App />);
+
+    const menuButton = screen.getByRole('button', {
+      name: /Abrir Menu e Tarefas Importantes/i,
+    });
+    expect(menuButton).toBeInTheDocument();
+    // Garante que o menu está acessível em qualquer tela (computador e celular)
+    expect(menuButton.className).not.toContain('lg:hidden');
+  });
+});
+
+describe('Proteção de Entrada de Senha Mobile & Computador', () => {
+  it('campos de senha e e-mail devem desativar autocapitalize, autocorrect e spellcheck e permitir alternar visibilidade', () => {
+    useTaskStore.setState({ currentUser: null });
+    render(<App />);
+
+    const passwordInput = screen.getByLabelText('Senha') as HTMLInputElement;
+    expect(passwordInput.getAttribute('autocapitalize')).toBe('none');
+    expect(passwordInput.getAttribute('autocorrect')).toBe('off');
+    expect(passwordInput.getAttribute('spellcheck')).toBe('false');
+    expect(passwordInput.type).toBe('password');
+
+    // Botão de revelar senha (ícone de olho)
+    const toggleButton = screen.getByRole('button', { name: /Ver senha/i });
+    expect(toggleButton).toBeInTheDocument();
+
+    fireEvent.click(toggleButton);
+    expect(passwordInput.type).toBe('text');
+
+    fireEvent.click(screen.getByRole('button', { name: /Ocultar senha/i }));
+    expect(passwordInput.type).toBe('password');
   });
 });
 

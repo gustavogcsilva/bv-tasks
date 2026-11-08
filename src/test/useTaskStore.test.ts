@@ -21,8 +21,8 @@ describe('useTaskStore — Autenticação (Google, E-mail, Recuperação), Tema 
     });
   });
 
-  it('deve criar conta com palavra-chave, recuperar senha por palavra-chave ou link de e-mail, e logar com Google', () => {
-    const res = useTaskStore
+  it('deve criar conta com palavra-chave, recuperar senha por palavra-chave ou link de e-mail, e logar com Google', async () => {
+    const res = await useTaskStore
       .getState()
       .registerAccount('Bruno Vinicius', 'bv@tasks.com', '123456', 'malbec');
 
@@ -31,12 +31,12 @@ describe('useTaskStore — Autenticação (Google, E-mail, Recuperação), Tema 
 
     // Simula esquecimento de senha e recuperação via palavra-chave ("malbec")
     useTaskStore.getState().logoutAccount();
-    const wrongKeyword = useTaskStore
+    const wrongKeyword = await useTaskStore
       .getState()
       .resetPasswordWithKeyword('bv@tasks.com', 'errada', 'nova123456');
     expect(wrongKeyword.ok).toBe(false);
 
-    const rightKeyword = useTaskStore
+    const rightKeyword = await useTaskStore
       .getState()
       .resetPasswordWithKeyword('bv@tasks.com', 'malbec', 'nova123456');
     expect(rightKeyword.ok).toBe(true);
@@ -48,14 +48,14 @@ describe('useTaskStore — Autenticação (Google, E-mail, Recuperação), Tema 
     expect(linkRes.ok).toBe(true);
     expect(linkRes.resetLink).toContain('reset_token=');
 
-    const emailReset = useTaskStore
+    const emailReset = await useTaskStore
       .getState()
       .resetPasswordViaEmailLink('bv@tasks.com', 'senhaEmail99');
     expect(emailReset.ok).toBe(true);
 
     // Simula autenticação via Google
     useTaskStore.getState().logoutAccount();
-    const googleRes = useTaskStore.getState().loginWithGoogle({
+    const googleRes = await useTaskStore.getState().loginWithGoogle({
       name: 'Bruno Google',
       email: 'bruno.google@gmail.com',
     });

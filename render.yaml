@@ -1,9 +1,15 @@
 services:
   - type: web
     name: bv-tasks
-    runtime: static
-    buildCommand: npm ci && npm run build
-    staticPublishPath: dist
+    runtime: node
+    plan: free
+    buildCommand: npm install && npm run build
+    startCommand: npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 10000
     headers:
       - path: /*
         name: X-Frame-Options
@@ -14,22 +20,3 @@ services:
       - path: /*
         name: Permissions-Policy
         value: camera=(self), microphone=(), geolocation=()
-      - path: /index.html
-        name: Cache-Control
-        value: no-cache
-      - path: /sw.js
-        name: Cache-Control
-        value: no-cache
-      - path: /sw.js
-        name: Service-Worker-Allowed
-        value: /
-      - path: /assets/*
-        name: Cache-Control
-        value: public, max-age=31536000, immutable
-      - path: /manifest.json
-        name: Content-Type
-        value: application/manifest+json
-    routes:
-      - type: rewrite
-        source: /*
-        destination: /index.html

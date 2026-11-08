@@ -38,7 +38,7 @@ export function FolderManager({
     >
       <div className="mb-3 flex items-center justify-between">
         <div>
-          <h2 className="font-serif text-[17px] font-bold text-[#0F0F12] dark:text-[#FAFAFA]">
+          <h2 className="text-[17px] font-bold tracking-tight text-[#0F0F12] dark:text-[#FAFAFA]">
             📁 Pastas
           </h2>
           <p className="text-[11px] text-[#71717A] dark:text-[#A1A1AA]">
