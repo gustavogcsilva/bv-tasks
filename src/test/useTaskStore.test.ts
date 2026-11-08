@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import { sortTasks, useTaskStore } from '../stores/useTaskStore';
 import {
   generateIcsContent,
+  generateTasksPdfBytes,
   getGoogleCalendarUrl,
 } from '../services/notificationsAndCalendar';
 import type { Task } from '../features/tasks/types/task.types';
@@ -88,6 +89,13 @@ describe('useTaskStore — Autenticação (Google, E-mail, Recuperação), Tema 
 
     const gcalUrl = getGoogleCalendarUrl(task);
     expect(gcalUrl).toContain('calendar.google.com/calendar/render');
+
+    const pdfBytes = generateTasksPdfBytes([task], { userName: 'Gustavo Geraldo' });
+    const pdfText = new TextDecoder().decode(pdfBytes);
+    expect(pdfText.startsWith('%PDF-1.4')).toBe(true);
+    expect(pdfText).toContain('B.V.S SPECIAL');
+    expect(pdfText).toContain('Gustavo Geraldo');
+    expect(pdfText).toContain(String(new Date().getFullYear()));
   });
 
   it('deve ordenar tarefas por status de conclusão, Prioridade (Alta > Média > Baixa) e horário', () => {

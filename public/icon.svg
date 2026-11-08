@@ -25,7 +25,8 @@
   <path d="M88 312C142 296 200 304 256 330C312 304 370 296 424 312V404C370 388 312 396 256 422C200 396 142 388 88 404V312Z" fill="#FAFAFA" stroke="#FDE68A" stroke-width="10" stroke-linejoin="round"/>
   <path d="M256 330V422" stroke="#991B1B" stroke-width="11" stroke-linecap="round"/>
 
-  <!-- Iniciais B V -->
-  <text x="58" y="236" fill="#FFFFFF" font-family="Georgia, serif" font-weight="bold" font-size="88">B</text>
-  <text x="372" y="236" fill="#FFFFFF" font-family="Georgia, serif" font-weight="bold" font-size="88">V</text>
+  <!-- Iniciais B V S -->
+  <text x="58" y="236" fill="#FFFFFF" font-family="Georgia, serif" font-weight="bold" font-size="82">B</text>
+  <text x="372" y="236" fill="#FFFFFF" font-family="Georgia, serif" font-weight="bold" font-size="82">V</text>
+  <text x="256" y="476" text-anchor="middle" fill="#FDE68A" font-family="Georgia, serif" font-weight="bold" font-size="56" letter-spacing="4">B • V • S</text>
 </svg>

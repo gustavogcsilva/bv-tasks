@@ -132,6 +132,9 @@ describe('Integração da Interface B.V.S Special PWA (Vinho & Preto, Claro/Escu
     render(<App />);
 
     expect(screen.getAllByText('B.V.S Special').length).toBeGreaterThanOrEqual(1);
+    expect(screen.getByText('B • V • S')).toBeInTheDocument();
+    expect(screen.getByText(/Gustavo Geraldo/i)).toBeInTheDocument();
+    expect(screen.getByText(new RegExp(String(new Date().getFullYear())))).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: 'Adicionar tarefa' }));
     const dialog = screen.getByRole('dialog');

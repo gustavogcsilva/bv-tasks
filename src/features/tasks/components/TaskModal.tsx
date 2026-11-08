@@ -20,7 +20,11 @@ interface TaskModalProps {
   onClose: () => void;
   onSubmit: (
     draft: TaskDraft,
-    options?: { syncWithPhoneCalendar?: boolean; notifyOnPhone?: boolean },
+    options?: {
+      syncWithPhoneCalendar?: boolean;
+      notifyOnPhone?: boolean;
+      exportAsPdf?: boolean;
+    },
   ) => void;
 }
 
@@ -134,6 +138,7 @@ export function TaskModal({
   const [attachments, setAttachments] = useState<TaskAttachment[]>([]);
   const [syncCalendar, setSyncCalendar] = useState(false);
   const [notifyPhone, setNotifyPhone] = useState(false);
+  const [exportPdfOnCreate, setExportPdfOnCreate] = useState(false);
   const [error, setError] = useState('');
 
   const cameraInputRef = useRef<HTMLInputElement | null>(null);
@@ -229,6 +234,7 @@ export function TaskModal({
       {
         syncWithPhoneCalendar: syncCalendar,
         notifyOnPhone: notifyPhone,
+        exportAsPdf: exportPdfOnCreate,
       },
     );
     resetFields();
@@ -244,6 +250,7 @@ export function TaskModal({
     setAttachments([]);
     setSyncCalendar(false);
     setNotifyPhone(false);
+    setExportPdfOnCreate(false);
     setError('');
   }
 
@@ -446,7 +453,7 @@ export function TaskModal({
             )}
           </div>
 
-          {/* Opções de Notificação e Sincronização com Calendário do Celular */}
+          {/* Opções de Notificação, Exportação PDF e Sincronização com Calendário do Celular */}
           <div className="flex flex-col gap-2 rounded-2xl border border-[#E5E4E0] bg-white p-3 dark:border-[#2E2E34] dark:bg-[#1C1C22]">
             <label className="flex cursor-pointer items-center gap-2.5 text-[13px] font-semibold text-[#27272A] dark:text-[#E4E4E7]">
               <input
@@ -465,6 +472,15 @@ export function TaskModal({
                 className="h-4 w-4 accent-[#991B1B]"
               />
               <span>📅 Sincronizar com o Calendário do Celular (iPhone / Android)</span>
+            </label>
+            <label className="flex cursor-pointer items-center gap-2.5 text-[13px] font-semibold text-[#27272A] dark:text-[#E4E4E7]">
+              <input
+                type="checkbox"
+                checked={exportPdfOnCreate}
+                onChange={(e) => setExportPdfOnCreate(e.target.checked)}
+                className="h-4 w-4 accent-[#991B1B]"
+              />
+              <span>📄 Gerar arquivo da tarefa e exportar como PDF (.pdf)</span>
             </label>
           </div>
 

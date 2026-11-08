@@ -659,6 +659,16 @@ export function AuthScreen() {
                     : 'Enviar link para o e-mail'}
           </Button>
         </form>
+
+        {/* Rodapé Executivo com Ano Dinâmico Automático (2026 -> 2027 -> ...) */}
+        <footer className="mt-6 border-t border-[#E5E4E0] pt-4 text-center text-[11px] font-semibold text-[#71717A] dark:border-[#27272A] dark:text-[#A1A1AA]">
+          <p>
+            <span className="font-extrabold text-[#991B1B] dark:text-[#F87171]">B.V.S Special</span>{' '}
+            — Created By{' '}
+            <span className="font-bold text-[#0F0F12] dark:text-[#FAFAFA]">Gustavo Geraldo</span> ©{' '}
+            <span>{new Date().getFullYear()}</span>
+          </p>
+        </footer>
       </div>
     </div>
   );

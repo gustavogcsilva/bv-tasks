@@ -20,7 +20,7 @@ export function Logo({ size = 'md', showText = true }: LogoProps) {
           className="h-full w-full p-1"
           fill="none"
           xmlns="http://www.w3.org/2000/svg"
-          aria-label="Logo B.V.S Special — Garrafa de Vinho, Taça de Vinho, Livro e Iniciais B V"
+          aria-label="Logo B.V.S Special — Garrafa de Vinho, Taça de Vinho, Livro e Iniciais B V S"
         >
           {/* Moldura circular executiva sutil */}
           <circle
@@ -77,28 +77,40 @@ export function Logo({ size = 'md', showText = true }: LogoProps) {
           <path d="M33 93C44 91 56 92 65 96" stroke="#991B1B" strokeWidth="1.6" strokeLinecap="round" strokeOpacity="0.6" />
           <path d="M107 93C96 91 84 92 75 96" stroke="#991B1B" strokeWidth="1.6" strokeLinecap="round" strokeOpacity="0.6" />
 
-          {/* Iniciais Profissionais B e V */}
+          {/* Iniciais Profissionais B V S (Simétricas e em Destaque) */}
           <text
             x="16"
-            y="65"
+            y="64"
             fill="#FFFFFF"
             fontFamily="system-ui, -apple-system, BlinkMacSystemFont, 'SF Pro Display', sans-serif"
             fontWeight="800"
-            fontSize="23"
+            fontSize="21"
             letterSpacing="-0.5"
           >
             B
           </text>
           <text
             x="101"
-            y="65"
+            y="64"
             fill="#FFFFFF"
             fontFamily="system-ui, -apple-system, BlinkMacSystemFont, 'SF Pro Display', sans-serif"
             fontWeight="800"
-            fontSize="23"
+            fontSize="21"
             letterSpacing="-0.5"
           >
             V
+          </text>
+          <text
+            x="70"
+            y="131"
+            textAnchor="middle"
+            fill="#FDE68A"
+            fontFamily="system-ui, -apple-system, BlinkMacSystemFont, 'SF Pro Display', sans-serif"
+            fontWeight="900"
+            fontSize="16"
+            letterSpacing="1"
+          >
+            B • V • S
           </text>
         </svg>
       </div>

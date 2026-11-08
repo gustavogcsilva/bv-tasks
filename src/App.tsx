@@ -12,6 +12,7 @@ import { TaskModal } from './features/tasks/components/TaskModal';
 import { SCOPE_CONFIG, type Task, type TaskDraft } from './features/tasks/types/task.types';
 import { useOnlineStatus } from './pwa/registerServiceWorker';
 import {
+  exportTasksToPdf,
   getNotificationPermission,
   requestNotificationPermission,
   sendTaskNotification,
@@ -186,6 +187,23 @@ export function BVTasksApp() {
   const completedCount = visibleTasks.filter((task) => task.isCompleted).length;
   const pendingCount = visibleTasks.length - completedCount;
   const dateLabel = format(selectedDate, "EEEE, d 'de' MMMM", { locale: ptBR });
+  const currentYear = new Date().getFullYear();
+
+  function handleExportAllPdf() {
+    exportTasksToPdf(tasks, `bvs-special-completo-${selectedDateKey}.pdf`, {
+      title: 'Relatorio Completo de Tarefas - B.V.S Special',
+      userName: currentUser?.name,
+    });
+    showToast('📄 Arquivo PDF gerado e exportado com sucesso!', 'success');
+  }
+
+  function handleExportDayPdf() {
+    exportTasksToPdf(visibleTasks, `bvs-special-agenda-${selectedDateKey}.pdf`, {
+      title: `Agenda do Dia (${selectedDateKey}) - B.V.S Special`,
+      userName: currentUser?.name,
+    });
+    showToast('📄 Arquivo PDF do dia exportado com sucesso!', 'success');
+  }
 
   async function handleEnableNotifications() {
     const granted = await requestNotificationPermission();
@@ -247,7 +265,11 @@ export function BVTasksApp() {
 
   function createTask(
     draft: TaskDraft,
-    options?: { syncWithPhoneCalendar?: boolean; notifyOnPhone?: boolean },
+    options?: {
+      syncWithPhoneCalendar?: boolean;
+      notifyOnPhone?: boolean;
+      exportAsPdf?: boolean;
+    },
   ) {
     const created = addTask(draft);
     setIsModalVisible(false);
@@ -268,7 +290,13 @@ export function BVTasksApp() {
       void sendTaskNotification(created, 'Nova Tarefa Agendada');
     }
     if (options?.syncWithPhoneCalendar) {
-      syncTasksWithPhoneCalendar([created], `bv-task-${created.date}.ics`);
+      syncTasksWithPhoneCalendar([created], `bvs-special-task-${created.date}.ics`);
+    }
+    if (options?.exportAsPdf) {
+      exportTasksToPdf([created], `bvs-special-tarefa-${created.date}.pdf`, {
+        title: `Ficha de Tarefa: ${created.title}`,
+        userName: currentUser?.name,
+      });
     }
   }
 
@@ -320,7 +348,11 @@ export function BVTasksApp() {
               isMobileDrawer={true}
               onCloseMobileDrawer={() => setIsMobileMenuOpen(false)}
               onSyncCalendar={() => {
-                syncTasksWithPhoneCalendar(tasks, 'bv-tasks-completo.ics');
+                syncTasksWithPhoneCalendar(tasks, 'bvs-special-completo.ics');
+                setIsMobileMenuOpen(false);
+              }}
+              onExportPdf={() => {
+                handleExportAllPdf();
                 setIsMobileMenuOpen(false);
               }}
             />
@@ -421,7 +453,8 @@ export function BVTasksApp() {
               tasks={tasks}
               onLogout={logoutAccount}
               onSelectTask={handleSelectImportantTask}
-              onSyncCalendar={() => syncTasksWithPhoneCalendar(tasks, 'bv-tasks-completo.ics')}
+              onSyncCalendar={() => syncTasksWithPhoneCalendar(tasks, 'bvs-special-completo.ics')}
+              onExportPdf={handleExportAllPdf}
             />
 
             <CalendarStrip
@@ -457,18 +490,27 @@ export function BVTasksApp() {
 
               <div className="flex flex-wrap items-center gap-2">
                 {visibleTasks.length > 0 && (
-                  <button
-                    type="button"
-                    onClick={() =>
-                      syncTasksWithPhoneCalendar(
-                        visibleTasks,
-                        `bv-tasks-${selectedDateKey}.ics`,
-                      )
-                    }
-                    className="cursor-pointer rounded-xl border border-[#E5E4E0] bg-[#F8F7F4] px-3 py-1.5 text-[11px] font-bold text-[#0F0F12] transition-colors hover:bg-[#ECE9E2] active:scale-95 dark:border-[#2E2E34] dark:bg-[#1C1C22] dark:text-[#FAFAFA]"
-                  >
-                    📲 Sincronizar Dia no Celular (.ics)
-                  </button>
+                  <>
+                    <button
+                      type="button"
+                      onClick={handleExportDayPdf}
+                      className="cursor-pointer rounded-xl border border-[#FECACA] bg-[#FEF2F2] px-3 py-1.5 text-[11px] font-bold text-[#991B1B] transition-colors hover:bg-[#FEE2E2] active:scale-95 dark:border-[#7F1D1D] dark:bg-[#271518] dark:text-[#FCA5A5]"
+                    >
+                      📄 Exportar Dia como PDF (.pdf)
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        syncTasksWithPhoneCalendar(
+                          visibleTasks,
+                          `bvs-special-${selectedDateKey}.ics`,
+                        )
+                      }
+                      className="cursor-pointer rounded-xl border border-[#E5E4E0] bg-[#F8F7F4] px-3 py-1.5 text-[11px] font-bold text-[#0F0F12] transition-colors hover:bg-[#ECE9E2] active:scale-95 dark:border-[#2E2E34] dark:bg-[#1C1C22] dark:text-[#FAFAFA]"
+                    >
+                      📲 Sincronizar Dia no Celular (.ics)
+                    </button>
+                  </>
                 )}
                 <span className="rounded-xl bg-[#F1EFEA] px-3 py-1.5 text-[12px] font-bold text-[#27272A] dark:bg-[#27272A] dark:text-[#E4E4E7]">
                   {pendingCount} pendente{pendingCount === 1 ? '' : 's'}
@@ -675,7 +717,18 @@ export function BVTasksApp() {
                 <button
                   type="button"
                   onClick={() => {
-                    syncTasksWithPhoneCalendar(tasks, 'bv-tasks-completo.ics');
+                    handleExportAllPdf();
+                    setIsSyncModalOpen(false);
+                  }}
+                  className="flex min-h-[44px] w-full cursor-pointer items-center justify-center gap-2 rounded-xl border border-[#FECACA] bg-[#FEF2F2] px-4 text-[13px] font-bold text-[#991B1B] transition-all hover:bg-[#FEE2E2] active:scale-[0.99] dark:border-[#7F1D1D] dark:bg-[#271518] dark:text-[#FCA5A5]"
+                >
+                  <span>📄 Gerar e Exportar Todas as Tarefas como PDF (.pdf)</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    syncTasksWithPhoneCalendar(tasks, 'bvs-special-completo.ics');
                     setIsSyncModalOpen(false);
                     showToast('📲 Calendário exportado para o aparelho!', 'success');
                   }}
@@ -699,6 +752,16 @@ export function BVTasksApp() {
             </div>
           </div>
         )}
+
+        {/* Rodapé Executivo com Ano Dinâmico Automático (2026 -> 2027 -> ...) */}
+        <footer className="mt-8 border-t border-[#E5E4E0] py-4 text-center text-[12px] font-semibold text-[#71717A] dark:border-[#27272A] dark:text-[#A1A1AA]">
+          <p>
+            <span className="font-extrabold text-[#991B1B] dark:text-[#F87171]">B.V.S Special</span>{' '}
+            — Created By{' '}
+            <span className="font-bold text-[#0F0F12] dark:text-[#FAFAFA]">Gustavo Geraldo</span> ©{' '}
+            <span>{currentYear}</span>
+          </p>
+        </footer>
       </div>
     </div>
   );

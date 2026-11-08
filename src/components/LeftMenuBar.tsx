@@ -11,6 +11,7 @@ interface LeftMenuBarProps {
   isMobileDrawer?: boolean;
   onCloseMobileDrawer?: () => void;
   onSyncCalendar?: () => void;
+  onExportPdf?: () => void;
 }
 
 export function LeftMenuBar({
@@ -21,6 +22,7 @@ export function LeftMenuBar({
   isMobileDrawer = false,
   onCloseMobileDrawer,
   onSyncCalendar,
+  onExportPdf,
 }: LeftMenuBarProps) {
   // Filtra as tarefas de alta prioridade (importantes)
   const importantTasks = useMemo(() => {
@@ -257,15 +259,28 @@ export function LeftMenuBar({
         )}
       </div>
 
-      {/* Ação rápida de exportação para calendário */}
-      {onSyncCalendar && (
-        <button
-          type="button"
-          onClick={onSyncCalendar}
-          className="flex min-h-[38px] w-full cursor-pointer items-center justify-center gap-2 rounded-xl border border-[#E5E4E0] bg-[#F8F7F4] px-3 text-[11px] font-bold text-[#0F0F12] transition-colors hover:bg-[#ECE9E2] active:scale-95 dark:border-[#27272A] dark:bg-[#1C1C22] dark:text-[#FAFAFA]"
-        >
-          <span>📲 Sincronizar com Calendário do Celular (.ics)</span>
-        </button>
+      {/* Ações rápidas de exportação para Calendário (.ics) e Arquivo PDF (.pdf) */}
+      {(onSyncCalendar || onExportPdf) && (
+        <div className="flex flex-col gap-2">
+          {onExportPdf && (
+            <button
+              type="button"
+              onClick={onExportPdf}
+              className="flex min-h-[38px] w-full cursor-pointer items-center justify-center gap-2 rounded-xl border border-[#FECACA] bg-[#FEF2F2] px-3 text-[11px] font-bold text-[#991B1B] transition-colors hover:bg-[#FEE2E2] active:scale-95 dark:border-[#7F1D1D] dark:bg-[#271518] dark:text-[#FCA5A5]"
+            >
+              <span>📄 Gerar e Exportar Tarefas como PDF (.pdf)</span>
+            </button>
+          )}
+          {onSyncCalendar && (
+            <button
+              type="button"
+              onClick={onSyncCalendar}
+              className="flex min-h-[38px] w-full cursor-pointer items-center justify-center gap-2 rounded-xl border border-[#E5E4E0] bg-[#F8F7F4] px-3 text-[11px] font-bold text-[#0F0F12] transition-colors hover:bg-[#ECE9E2] active:scale-95 dark:border-[#27272A] dark:bg-[#1C1C22] dark:text-[#FAFAFA]"
+            >
+              <span>📲 Sincronizar com Calendário do Celular (.ics)</span>
+            </button>
+          )}
+        </div>
       )}
     </div>
   );

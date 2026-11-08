@@ -2,6 +2,7 @@ import { useRef, useState, type ChangeEvent } from 'react';
 import { Badge } from '../../../components/ui/Badge';
 import { Card } from '../../../components/ui/Card';
 import {
+  exportTasksToPdf,
   getGoogleCalendarUrl,
   sendTaskNotification,
   syncTasksWithPhoneCalendar,
@@ -82,7 +83,13 @@ export function TaskItem({
   }
 
   function handleSyncCalendar() {
-    syncTasksWithPhoneCalendar([task], `bv-task-${task.date}.ics`);
+    syncTasksWithPhoneCalendar([task], `bvs-special-task-${task.date}.ics`);
+  }
+
+  function handleExportTaskPdf() {
+    exportTasksToPdf([task], `bvs-special-tarefa-${task.date}.pdf`, {
+      title: `Ficha de Tarefa: ${task.title}`,
+    });
   }
 
   const isPulsing = isRecentlyCreated || isHighlighted;
@@ -327,6 +334,15 @@ export function TaskItem({
               className="min-h-[32px] cursor-pointer rounded-lg bg-[#F1EFEA] px-2.5 text-[11px] font-bold text-[#27272A] transition-colors hover:bg-[#E5E2DC] active:scale-95 dark:bg-[#27272A] dark:text-[#E4E4E7]"
             >
               📅 Calendário (.ics)
+            </button>
+
+            <button
+              type="button"
+              onClick={handleExportTaskPdf}
+              title="Gerar e exportar esta tarefa como arquivo PDF (.pdf)"
+              className="min-h-[32px] cursor-pointer rounded-lg bg-[#FEE2E2] px-2.5 text-[11px] font-bold text-[#991B1B] transition-colors hover:bg-[#FECACA] active:scale-95 dark:bg-[#3B1219] dark:text-[#FCA5A5]"
+            >
+              📄 Exportar PDF
             </button>
 
             <a
