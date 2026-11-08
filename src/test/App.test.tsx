@@ -90,7 +90,10 @@ describe('Integração da Interface B V Tasks PWA (Vinho & Preto, Claro/Escuro, 
     fireEvent.click(within(dialog).getByRole('button', { name: 'Criar tarefa' }));
 
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
-    expect(screen.getByText('Degustação & Leitura Executiva')).toBeInTheDocument();
+    // A tarefa importante aparece tanto na Agenda quanto na Barra de Menu Lateral
+    const taskTitles = screen.getAllByText('Degustação & Leitura Executiva');
+    expect(taskTitles.length).toBeGreaterThanOrEqual(1);
+    expect(screen.getByText('Mini Status Bar')).toBeInTheDocument();
     expect(screen.getByText('📅 Calendário (.ics)')).toBeInTheDocument();
     expect(screen.getByText('🔔 Notificar')).toBeInTheDocument();
 

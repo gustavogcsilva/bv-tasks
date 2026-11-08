@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { format, isSameDay, isValid, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { LeftMenuBar } from './components/LeftMenuBar';
 import { Button } from './components/ui/Button';
 import { Logo } from './components/ui/Logo';
 import { AuthScreen } from './features/auth/components/AuthScreen';
@@ -8,7 +9,7 @@ import { CalendarStrip } from './features/calendar/components/CalendarStrip';
 import { FolderManager } from './features/folders/components/FolderManager';
 import { TaskItem } from './features/tasks/components/TaskItem';
 import { TaskModal } from './features/tasks/components/TaskModal';
-import { SCOPE_CONFIG, type TaskDraft } from './features/tasks/types/task.types';
+import { SCOPE_CONFIG, type Task, type TaskDraft } from './features/tasks/types/task.types';
 import { useOnlineStatus } from './pwa/registerServiceWorker';
 import {
   getNotificationPermission,
@@ -29,8 +30,10 @@ export function BVTasksApp() {
   const [notifPermission, setNotifPermission] = useState(() => getNotificationPermission());
   const isOnline = useOnlineStatus();
 
-  // Estados de feedback de criação de tarefa e sincronização
+  // Estados de feedback, menu mobile e sincronização
   const [recentlyCreatedTaskId, setRecentlyCreatedTaskId] = useState<string | null>(null);
+  const [highlightedTaskId, setHighlightedTaskId] = useState<string | null>(null);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [toast, setToast] = useState<ToastState | null>(null);
   const [isSyncModalOpen, setIsSyncModalOpen] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
@@ -63,6 +66,11 @@ export function BVTasksApp() {
   const setSelectedDate = useTaskStore((state) => state.setSelectedDate);
   const setScopeFilter = useTaskStore((state) => state.setScopeFilter);
   const setSelectedFolderId = useTaskStore((state) => state.setSelectedFolderId);
+
+  // Contagem de tarefas importantes (alta prioridade) para o badge
+  const highPriorityCount = useMemo(() => {
+    return tasks.filter((t) => t.priority === 'high' && !t.isCompleted).length;
+  }, [tasks]);
 
   // Exibe notificação flutuante com auto-fechamento
   function showToast(message: string, type: 'success' | 'info' | 'warning' = 'info') {
@@ -176,6 +184,45 @@ export function BVTasksApp() {
     }, 600);
   }
 
+  // Clicando na tarefa importante da Barra de Menu: navega diretamente para a data e rola até ela
+  function handleSelectImportantTask(task: Task) {
+    // 1. Muda a data selecionada para a data da tarefa
+    setSelectedDate(task.date);
+
+    // 2. Destrava filtros caso estejam escondendo a tarefa
+    if (scopeFilter !== 'all' && scopeFilter !== task.scope) {
+      setScopeFilter('all');
+    }
+    if (selectedFolderId !== 'all' && task.folderId !== selectedFolderId) {
+      setSelectedFolderId('all');
+    }
+
+    // 3. Fecha o menu gaveta no celular
+    setIsMobileMenuOpen(false);
+
+    // 4. Ativa o destaque pulsante
+    setHighlightedTaskId(task.id);
+    setTimeout(() => {
+      setHighlightedTaskId(null);
+    }, 4000);
+
+    // 5. Rola suavemente até o elemento da tarefa na tela
+    setTimeout(() => {
+      const el = document.getElementById(`task-card-${task.id}`);
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+    }, 120);
+
+    // 6. Toast com detalhes da tarefa e o que ela faz
+    const desc = task.description?.trim() ? ` — "${task.description.trim()}"` : '';
+    showToast(`⭐ Tarefa importante: "${task.title}"${desc}`, 'info');
+
+    if ('vibrate' in navigator) {
+      navigator.vibrate?.([30, 40, 30]);
+    }
+  }
+
   function createTask(
     draft: TaskDraft,
     options?: { syncWithPhoneCalendar?: boolean; notifyOnPhone?: boolean },
@@ -226,10 +273,61 @@ export function BVTasksApp() {
         </div>
       )}
 
+      {/* Drawer Mobile da Barra de Menu Lateral */}
+      {isMobileMenuOpen && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label="Menu Lateral do Usuário e Tarefas Importantes"
+          className="animate-modal-backdrop fixed inset-0 z-50 flex bg-black/60 backdrop-blur-xs lg:hidden"
+        >
+          <div
+            aria-hidden="true"
+            onClick={() => setIsMobileMenuOpen(false)}
+            className="fixed inset-0"
+          />
+          <div className="animate-modal-content safe-area-container relative z-10 flex h-full w-[88vw] max-w-[360px] flex-col overflow-y-auto bg-[#F8F7F4] p-4 shadow-2xl dark:bg-[#09090B]">
+            <LeftMenuBar
+              currentUser={currentUser}
+              tasks={tasks}
+              onLogout={logoutAccount}
+              onSelectTask={handleSelectImportantTask}
+              isMobileDrawer={true}
+              onCloseMobileDrawer={() => setIsMobileMenuOpen(false)}
+              onSyncCalendar={() => {
+                syncTasksWithPhoneCalendar(tasks, 'bv-tasks-completo.ics');
+                setIsMobileMenuOpen(false);
+              }}
+            />
+          </div>
+        </div>
+      )}
+
       <div className="safe-area-container mx-auto flex min-h-dvh w-full max-w-6xl flex-col">
         {/* Cabeçalho Principal B V Tasks (Vermelho Vinho e Preto + Tipografia HIG + Claro/Escuro) */}
         <header className="mb-6 flex flex-wrap items-center justify-between gap-3 pt-1">
-          <Logo size="md" showText />
+          <div className="flex items-center gap-2.5">
+            <Logo size="md" showText />
+
+            {/* Botão de Menu & Perfil Mobile (para abrir barra lateral no celular) */}
+            <button
+              type="button"
+              onClick={() => setIsMobileMenuOpen(true)}
+              aria-label="Abrir Menu e Tarefas Importantes"
+              className="flex h-[40px] cursor-pointer items-center gap-2 rounded-xl border border-[#991B1B]/30 bg-white px-2.5 text-[12px] font-bold text-[#0F0F12] shadow-xs lg:hidden dark:border-[#7F1D1D] dark:bg-[#1C1C22] dark:text-[#FAFAFA]"
+            >
+              <span className="text-[14px]">☰</span>
+              <span className="flex h-5 w-5 items-center justify-center rounded-full bg-[#991B1B] text-[10px] text-white">
+                {currentUser.name.charAt(0).toUpperCase()}
+              </span>
+              <span className="max-w-[75px] truncate sm:max-w-[120px]">{currentUser.name}</span>
+              {highPriorityCount > 0 && (
+                <span className="rounded-full bg-[#DC2626] px-1.5 py-0.5 text-[9px] font-black text-white">
+                  ⭐ {highPriorityCount}
+                </span>
+              )}
+            </button>
+          </div>
 
           <div className="flex flex-wrap items-center gap-2">
             {/* Indicador Interativo de Sincronização Mobile & Desktop (Online / Offline) */}
@@ -268,8 +366,8 @@ export function BVTasksApp() {
               </button>
             )}
 
-            {/* Perfil do Usuário Autenticado */}
-            <div className="hidden items-center gap-2 rounded-xl border border-[#E5E4E0] bg-white px-3 py-1.5 sm:flex dark:border-[#27272A] dark:bg-[#141418]">
+            {/* Perfil do Usuário Autenticado (no Desktop) */}
+            <div className="hidden items-center gap-2 rounded-xl border border-[#E5E4E0] bg-white px-3 py-1.5 lg:flex dark:border-[#27272A] dark:bg-[#141418]">
               {currentUser.avatarUrl ? (
                 <img
                   src={currentUser.avatarUrl}
@@ -306,10 +404,19 @@ export function BVTasksApp() {
           </div>
         </header>
 
-        {/* Layout Responsivo: Lado Esquerdo (Calendário + Pastas) | Lado Direito (Agenda e Tarefas) */}
+        {/* Layout Responsivo: Lado Esquerdo (Menu Bar com Login e Mini Status + Calendário + Pastas) | Lado Direito (Agenda e Tarefas) */}
         <main className="grid flex-1 grid-cols-1 gap-6 lg:grid-cols-[380px_1fr] xl:grid-cols-[410px_1fr]">
-          {/* Coluna Esquerda: Calendário com Cores por Escopo + Gerenciador de Pastas */}
+          {/* Coluna Esquerda: Barra de Menu & Login + Mini Status Bar + Calendário + Pastas */}
           <aside className="flex flex-col gap-5">
+            {/* Barra de Menu com Login e Mini Status das Tarefas Importantes */}
+            <LeftMenuBar
+              currentUser={currentUser}
+              tasks={tasks}
+              onLogout={logoutAccount}
+              onSelectTask={handleSelectImportantTask}
+              onSyncCalendar={() => syncTasksWithPhoneCalendar(tasks, 'bv-tasks-completo.ics')}
+            />
+
             <CalendarStrip
               selectedDate={selectedDate}
               onSelectDate={(date) => setSelectedDate(format(date, 'yyyy-MM-dd'))}
@@ -421,6 +528,7 @@ export function BVTasksApp() {
                       key={item.id}
                       task={item}
                       isRecentlyCreated={item.id === recentlyCreatedTaskId}
+                      isHighlighted={item.id === highlightedTaskId}
                       folder={item.folderId ? folderMap.get(item.folderId) : undefined}
                       onDelete={() => deleteTask(item.id)}
                       onToggle={() => toggleTask(item.id)}

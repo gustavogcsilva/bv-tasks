@@ -30,6 +30,7 @@ interface TaskItemProps {
   task: Task;
   folder?: TaskFolder;
   isRecentlyCreated?: boolean;
+  isHighlighted?: boolean;
   onToggle: () => void;
   onDelete: () => void;
   onAddAttachment?: (attachment: TaskAttachment) => void;
@@ -40,6 +41,7 @@ export function TaskItem({
   task,
   folder,
   isRecentlyCreated,
+  isHighlighted,
   onToggle,
   onDelete,
   onAddAttachment,
@@ -83,13 +85,16 @@ export function TaskItem({
     syncTasksWithPhoneCalendar([task], `bv-task-${task.date}.ics`);
   }
 
+  const isPulsing = isRecentlyCreated || isHighlighted;
+
   return (
     <Card
+      id={`task-card-${task.id}`}
       className={`flex min-h-[150px] overflow-hidden transition-all duration-300 ${
         task.isCompleted ? 'opacity-70' : ''
       } ${
-        isRecentlyCreated
-          ? 'animate-task-enter ring-2 ring-[#991B1B] shadow-lg shadow-[#991B1B]/20 animate-highlight-pulse'
+        isPulsing
+          ? 'animate-task-enter ring-2 ring-[#991B1B] shadow-xl shadow-[#991B1B]/25 animate-highlight-pulse scale-[1.01]'
           : ''
       }`}
     >

@@ -283,6 +283,7 @@ export const useTaskStore = create<TaskStore>()(
         if (existing) {
           const updated: UserAccount = {
             ...existing,
+            provider: 'google',
             avatarUrl: googleProfile.avatarUrl ?? existing.avatarUrl,
             googleId: googleProfile.googleId ?? existing.googleId,
           };

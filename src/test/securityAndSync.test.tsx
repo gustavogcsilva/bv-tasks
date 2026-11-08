@@ -101,9 +101,131 @@ describe('Engenharia de Segurança — Validação de Tokens Google e Proteção
     expect(screen.queryByText(/Convidado/i)).not.toBeInTheDocument();
     expect(screen.queryByText(/Testar Direto/i)).not.toBeInTheDocument();
   });
+
+  it('deve autenticar com a Conta Google como se fosse entrar no e-mail (com e-mail e senha, sem exigir JWT)', () => {
+    window.localStorage.clear();
+    useTaskStore.setState({ currentUser: null, registeredAccounts: [] });
+
+    render(<App />);
+
+    // Clica em Continuar com o Google
+    fireEvent.click(screen.getByRole('button', { name: /Continuar com o Google/i }));
+
+    expect(screen.getByText('Entrar com a Conta Google')).toBeInTheDocument();
+    // Confirma que NÃO existe campo de JWT
+    expect(screen.queryByText(/Token JWT/i)).not.toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText('E-mail da sua Conta Google'), {
+      target: { value: 'gestor.executivo@gmail.com' },
+    });
+    fireEvent.change(screen.getByLabelText('Senha da Conta Google'), {
+      target: { value: 'senhaForte123' },
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Autenticar com o Google' }));
+
+    // Confirma que entrou com a conta Google autenticada
+    expect(useTaskStore.getState().currentUser?.email).toBe('gestor.executivo@gmail.com');
+    expect(useTaskStore.getState().currentUser?.provider).toBe('google');
+  });
 });
 
-describe('Sincronização Mobile (Online / Offline) e Animação de Tarefas', () => {
+describe('Barra de Menu Lateral (Quem está logado, Mini Status Bar e Tarefas Importantes)', () => {
+  beforeEach(() => {
+    window.localStorage.clear();
+    useTaskStore.setState({
+      currentUser: {
+        id: 'user-auth-1',
+        name: 'Bruno V.',
+        email: 'bruno@bvtasks.com',
+        passwordHash: '123456',
+        provider: 'email',
+        createdAt: '2026-11-07T00:00:00.000Z',
+      },
+      tasks: [
+        {
+          id: 'task-imp-1',
+          title: 'Revisão Contratual Urgente',
+          description: 'Analisar cláusulas de entrega e conformidade financeira',
+          date: '2026-11-10',
+          time: '15:00',
+          priority: 'high',
+          scope: 'work',
+          isCompleted: false,
+          createdAt: '2026-11-07T00:00:00.000Z',
+        },
+        {
+          id: 'task-normal-2',
+          title: 'Organizar gaveta pessoal',
+          date: '2026-11-07',
+          priority: 'low',
+          scope: 'personal',
+          isCompleted: true,
+          createdAt: '2026-11-07T00:00:00.000Z',
+        },
+      ],
+      folders: [],
+      selectedDate: '2026-11-07',
+      scopeFilter: 'all',
+      selectedFolderId: 'all',
+      theme: 'light',
+    });
+  });
+
+  it('deve demonstrar na Barra de Menu quem está logado e o Mini Status Bar com contagens', () => {
+    render(<App />);
+
+    // Barra de Menu no lado esquerdo com o usuário logado
+    expect(screen.getAllByText('Bruno V.').length).toBeGreaterThanOrEqual(1);
+    expect(screen.getByText('bruno@bvtasks.com')).toBeInTheDocument();
+
+    // Mini Status Bar
+    expect(screen.getByText('Mini Status Bar')).toBeInTheDocument();
+    expect(screen.getByText('⭐ Importantes')).toBeInTheDocument();
+  });
+
+  it('deve exibir a tarefa importante com "O que faz:" e clicando nela ir direto para a tarefa', () => {
+    render(<App />);
+
+    // Verifica que a tarefa importante está listada na barra de menu
+    expect(screen.getByText('Revisão Contratual Urgente')).toBeInTheDocument();
+    expect(screen.getByText(/Analisar cláusulas de entrega/i)).toBeInTheDocument();
+    expect(screen.getByText('Ver na agenda →')).toBeInTheDocument();
+
+    // Clica no card da tarefa importante
+    const importantCard = screen.getByRole('button', {
+      name: /Revisão Contratual Urgente/i,
+    });
+    fireEvent.click(importantCard);
+
+    // Deve ter navegado para a data da tarefa (2026-11-10)
+    expect(useTaskStore.getState().selectedDate).toBe('2026-11-10');
+  });
+
+  it('deve exibir o botão de menu mobile para celulares e abrir a barra de menu em gaveta', () => {
+    render(<App />);
+
+    // Botão mobile no cabeçalho
+    const mobileMenuButton = screen.getByRole('button', {
+      name: /Abrir Menu e Tarefas Importantes/i,
+    });
+    expect(mobileMenuButton).toBeInTheDocument();
+
+    // Abre a gaveta mobile
+    fireEvent.click(mobileMenuButton);
+
+    const drawerDialog = screen.getByRole('dialog', {
+      name: /Menu Lateral do Usuário e Tarefas Importantes/i,
+    });
+    expect(drawerDialog).toBeInTheDocument();
+
+    // Fecha a gaveta
+    fireEvent.click(screen.getByRole('button', { name: 'Fechar menu' }));
+    expect(screen.queryByRole('dialog', { name: /Menu Lateral do Usuário/i })).not.toBeInTheDocument();
+  });
+});
+
+describe('Sincronização Mobile (Online / Offline)', () => {
   beforeEach(() => {
     window.localStorage.clear();
     useTaskStore.setState({

@@ -38,18 +38,16 @@ export function AuthScreen() {
   const [generatedResetLink, setGeneratedResetLink] = useState<string | null>(null);
   const [isEmailResetStep2, setIsEmailResetStep2] = useState(false);
 
-  // Estados específicos para autenticação com Google
+  // Estados para autenticação estilo conta de e-mail do Google (sem JWT)
   const [googleEmail, setGoogleEmail] = useState('');
   const [googlePassword, setGooglePassword] = useState('');
   const [googleName, setGoogleName] = useState('');
-  const [googleTokenInput, setGoogleTokenInput] = useState('');
-  const [showTokenInput, setShowTokenInput] = useState(false);
 
   const [error, setError] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
   const googleBtnContainerRef = useRef<HTMLDivElement | null>(null);
 
-  // Inicializa o Google Identity Services (GSI)
+  // Inicializa o Google Identity Services (GSI) caso haja Client ID configurado
   useEffect(() => {
     let isMounted = true;
     const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID || '';
@@ -200,6 +198,7 @@ export function AuthScreen() {
     clearFeedback();
     const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID || '';
 
+    // Se houver Google Client ID configurado no ambiente, tenta abrir o prompt nativo
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const google = (window as any).google;
     if (google?.accounts?.id && clientId) {
@@ -211,12 +210,11 @@ export function AuthScreen() {
         });
         return;
       } catch {
-        // Fallback para formulário seguro de conta Google
+        // Fallback para formulário direto de conta Google
       }
     }
 
-    // Se o Client ID não estiver configurado no deploy ou for bloqueado por navegador,
-    // direciona para a validação estrita da conta Google
+    // Abre o formulário limpo de autenticação do Google (como entrar no e-mail, sem JWT)
     setMode('google-direct');
     if (email && email.includes('@')) {
       setGoogleEmail(email);
@@ -226,30 +224,12 @@ export function AuthScreen() {
   function handleDirectGoogleAuth() {
     clearFeedback();
 
-    // Se o usuário colou um token JWT do Google (OAuth credential)
-    if (showTokenInput && googleTokenInput.trim()) {
-      const verification = verifyGoogleJwt(googleTokenInput.trim());
-      if (verification.ok && verification.profile) {
-        loginWithGoogle({
-          name: verification.profile.name,
-          email: verification.profile.email,
-          avatarUrl: verification.profile.picture,
-          googleId: verification.profile.id,
-        });
-        return;
-      }
-      setError(verification.error ?? 'Token JWT do Google inválido.');
-      return;
-    }
-
-    // Validação estrita do e-mail da Conta Google
     const normalizedEmail = googleEmail.trim().toLowerCase();
     if (!isValidEmail(normalizedEmail)) {
       setError('Informe um e-mail Google válido (ex: seu.nome@gmail.com ou conta corporativa).');
       return;
     }
 
-    // Deve ser uma conta @gmail.com ou domínio corporativo
     if (!normalizedEmail.endsWith('@gmail.com') && !normalizedEmail.includes('@')) {
       setError('O e-mail deve ser uma conta Google válida (@gmail.com).');
       return;
@@ -257,7 +237,7 @@ export function AuthScreen() {
 
     const passCheck = validatePassword(googlePassword);
     if (!passCheck.valid) {
-      setError('Informe a senha de acesso da sua conta (mínimo de 6 caracteres).');
+      setError('Informe a senha da sua conta Google (mínimo de 6 caracteres).');
       return;
     }
 
@@ -265,11 +245,11 @@ export function AuthScreen() {
       googleName.trim() ||
       normalizedEmail.split('@')[0].replace('.', ' ').replace(/\b\w/g, (c) => c.toUpperCase());
 
-    // Autentica ou registra a conta Google com credencial verificada
+    // Se já houver conta cadastrada com esse e-mail Google, valida a senha
     const existing = registeredAccounts.find((a) => a.email === normalizedEmail);
     if (existing) {
       if (existing.passwordHash !== googlePassword && existing.provider !== 'google') {
-        setError('Este e-mail Google já possui senha cadastrada. Digite a senha correta.');
+        setError('Senha incorreta para esta conta Google cadastrada.');
         return;
       }
       loginWithGoogle({
@@ -279,8 +259,7 @@ export function AuthScreen() {
         avatarUrl: existing.avatarUrl,
       });
     } else {
-      // Registra a nova conta com provedor Google verificado
-      registerAccount(resolvedName, normalizedEmail, googlePassword, 'google');
+      // Registra e autentica diretamente como conta Google verificada
       loginWithGoogle({
         name: resolvedName,
         email: normalizedEmail,
@@ -320,7 +299,7 @@ export function AuthScreen() {
         {/* Container para o botão oficial do Google Identity Services (GSI) */}
         <div ref={googleBtnContainerRef} className="empty:hidden mb-2.5 w-full" />
 
-        {/* Botão de Autenticação Segura com Google */}
+        {/* Botão de Autenticação com Google */}
         <button
           type="button"
           onClick={handleGoogleButtonTrigger}
@@ -404,13 +383,33 @@ export function AuthScreen() {
         </div>
 
         <form onSubmit={handleSubmit} className="flex flex-col gap-3.5">
-          {/* Autenticação com Conta Google Segura */}
+          {/* Autenticação Direta com Conta Google (Sem JWT, como entrar no e-mail) */}
           {mode === 'google-direct' && (
-            <div className="rounded-2xl border border-[#991B1B]/30 bg-[#FEF2F2] p-4 dark:border-[#7F1D1D] dark:bg-[#201014]">
+            <div className="rounded-2xl border border-[#991B1B]/30 bg-[#FEF2F2] p-4.5 dark:border-[#7F1D1D] dark:bg-[#201014]">
               <div className="mb-3 flex items-center justify-between">
-                <span className="text-[13px] font-extrabold text-[#991B1B] dark:text-[#FCA5A5]">
-                  🔐 Conectar Conta Google
-                </span>
+                <div className="flex items-center gap-2">
+                  <svg className="h-4 w-4" viewBox="0 0 24 24" aria-hidden="true">
+                    <path
+                      fill="#EA4335"
+                      d="M12 10.2v3.9h5.5c-.2 1.2-.9 2.3-2 3l3.2 2.5c1.9-1.7 3-4.3 3-7.4 0-.7-.1-1.4-.2-2H12z"
+                    />
+                    <path
+                      fill="#34A853"
+                      d="M12 22c2.7 0 5-.9 6.7-2.4l-3.2-2.5c-.9.6-2 1-3.5 1-2.7 0-5-1.8-5.8-4.3H2.9v2.6C4.6 19.8 8 22 12 22z"
+                    />
+                    <path
+                      fill="#4A90E2"
+                      d="M6.2 13.8c-.2-.6-.3-1.2-.3-1.8s.1-1.2.3-1.8V7.6H2.9C2.3 8.9 2 10.4 2 12s.3 3.1.9 4.4l3.3-2.6z"
+                    />
+                    <path
+                      fill="#FBBC05"
+                      d="M12 5.9c1.5 0 2.8.5 3.9 1.5l2.9-2.9C17 2.9 14.7 2 12 2 8 2 4.6 4.2 2.9 7.6l3.3 2.6c.8-2.5 3.1-4.3 5.8-4.3z"
+                    />
+                  </svg>
+                  <span className="text-[13px] font-extrabold text-[#991B1B] dark:text-[#FCA5A5]">
+                    Entrar com a Conta Google
+                  </span>
+                </div>
                 <button
                   type="button"
                   onClick={() => setMode('login')}
@@ -420,52 +419,33 @@ export function AuthScreen() {
                 </button>
               </div>
 
-              <p className="mb-3 text-[12px] text-[#52525B] dark:text-[#D4D4D8]">
-                Autentique com seu e-mail Google (@gmail.com ou Workspace). Suas credenciais são
-                verificadas com segurança de ponta a ponta.
+              <p className="mb-3 text-[12px] leading-relaxed text-[#52525B] dark:text-[#D4D4D8]">
+                Informe o seu e-mail do Google e a sua senha para autenticar com segurança e
+                sincronizar suas tarefas.
               </p>
 
               <div className="flex flex-col gap-3">
                 <Input
-                  label="Seu E-mail Google"
+                  label="E-mail da sua Conta Google"
                   type="email"
-                  placeholder="voce@gmail.com"
+                  placeholder="seu.email@gmail.com"
                   value={googleEmail}
                   onChangeText={setGoogleEmail}
                   autoFocus
                 />
                 <Input
-                  label="Seu Nome de Usuário"
+                  label="Senha da Conta Google"
+                  type="password"
+                  placeholder="Digite sua senha de acesso"
+                  value={googlePassword}
+                  onChangeText={setGooglePassword}
+                />
+                <Input
+                  label="Seu Nome (opcional)"
                   placeholder="Ex.: Bruno Vinicius"
                   value={googleName}
                   onChangeText={setGoogleName}
                 />
-                <Input
-                  label="Senha de Acesso da Conta"
-                  type="password"
-                  placeholder="Mínimo de 6 caracteres"
-                  value={googlePassword}
-                  onChangeText={setGooglePassword}
-                />
-
-                <div className="flex items-center justify-between pt-1">
-                  <button
-                    type="button"
-                    onClick={() => setShowTokenInput(!showTokenInput)}
-                    className="cursor-pointer text-[11px] font-semibold text-[#991B1B] hover:underline dark:text-[#FCA5A5]"
-                  >
-                    {showTokenInput ? '− Ocultar Token JWT' : '+ Validar com Token JWT do Google'}
-                  </button>
-                </div>
-
-                {showTokenInput && (
-                  <Input
-                    label="Credencial JWT do Google (ID Token)"
-                    placeholder="Cole o token JWT fornecido pelo Google"
-                    value={googleTokenInput}
-                    onChangeText={setGoogleTokenInput}
-                  />
-                )}
               </div>
             </div>
           )}
