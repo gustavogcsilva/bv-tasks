@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover"
+    />
+    <title>B V Tasks</title>
+    <meta
+      name="description"
+      content="B V Tasks — Planejamento Executivo com Calendário, Pastas, Câmera/PDFs, Notificações e Sincronização Mobile."
+    />
+
+    <!-- Tipografia Profissional (Plus Jakarta Sans & Playfair Display) com fallback de sistema -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap"
+      rel="stylesheet"
+    />
+
+    <!-- PWA & Theme (Vermelho Vinho e Preto) -->
+    <meta name="theme-color" content="#7F1D1D" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#09090B" media="(prefers-color-scheme: dark)" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <link rel="manifest" href="/manifest.json" />
+
+    <!-- iOS Web App Meta Tags (iPhone Safari Standalone) -->
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="B V Tasks" />
+    <meta name="format-detection" content="telephone=no" />
+
+    <!-- Ícones para iOS, Android e Navegadores -->
+    <link rel="icon" type="image/svg+xml" href="/icon.svg" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
+  </head>
+  <body class="bg-[#F8F7F4] text-[#0F0F12] antialiased selection:bg-[#991B1B]/20 dark:bg-[#09090B] dark:text-[#F4F4F5]">
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
