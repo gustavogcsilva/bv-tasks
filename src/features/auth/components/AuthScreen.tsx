@@ -297,11 +297,11 @@ export function AuthScreen() {
           </button>
         </div>
 
-        {/* Logo B V Tasks (Garrafa + Taça de Vinho + Livro + B V) com Tipografia de Sistema HIG */}
+        {/* Logo B.V.S Special (Garrafa + Taça de Vinho + Livro + B V) com Tipografia de Sistema HIG */}
         <div className="mb-6 flex flex-col items-center text-center">
           <Logo size="lg" showText={false} />
           <h1 className="mt-4 text-[26px] font-extrabold tracking-tight text-[#0F0F12] dark:text-[#FAFAFA]">
-            B V Tasks
+            B.V.S Special
           </h1>
           <p className="mt-1 text-[13px] font-medium text-[#52525B] dark:text-[#A1A1AA]">
             Planejamento executivo para{' '}
@@ -611,9 +611,9 @@ export function AuthScreen() {
                   </button>
                   <a
                     href={`mailto:${encodeURIComponent(email.trim())}?subject=${encodeURIComponent(
-                      'Recuperação de Senha — B V Tasks',
+                      'Recuperação de Senha — B.V.S Special',
                     )}&body=${encodeURIComponent(
-                      `Olá,\n\nUse este link para redefinir sua senha no B V Tasks:\n${generatedResetLink}`,
+                      `Olá,\n\nUse este link para redefinir sua senha no B.V.S Special:\n${generatedResetLink}`,
                     )}`}
                     className="rounded-lg border border-[#991B1B] px-3 py-1.5 text-[12px] font-bold text-[#991B1B] dark:text-[#FCA5A5]"
                   >
@@ -653,7 +653,7 @@ export function AuthScreen() {
               : mode === 'register'
                 ? 'Criar conta e acessar'
                 : mode === 'login'
-                  ? 'Entrar no B V Tasks'
+                  ? 'Entrar no B.V.S Special'
                   : recoveryMethod === 'keyword' || isEmailResetStep2
                     ? 'Redefinir senha e entrar'
                     : 'Enviar link para o e-mail'}

@@ -6,10 +6,10 @@
       name="viewport"
       content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover"
     />
-    <title>B V Tasks</title>
+    <title>B.V.S Special</title>
     <meta
       name="description"
-      content="B V Tasks — Planejamento Executivo com Calendário, Pastas, Câmera/PDFs, Notificações e Sincronização Mobile."
+      content="B.V.S Special — Planejamento Executivo com Calendário, Pastas, Câmera/PDFs, Notificações e Sincronização Mobile."
     />
 
     <!-- Tipografia Executiva Padrão Apple HIG & Inter com fallback nativo de sistema -->
@@ -32,7 +32,7 @@
     <!-- iOS Web App Meta Tags (iPhone Safari Standalone) -->
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-    <meta name="apple-mobile-web-app-title" content="B V Tasks" />
+    <meta name="apple-mobile-web-app-title" content="B.V.S Special" />
     <meta name="format-detection" content="telephone=no" />
 
     <!-- Ícones para iOS, Android e Navegadores -->
@@ -42,7 +42,7 @@
     <!-- Script de Autocura e Proteção contra Tela Branca / Cache Legado -->
     <script>
       (function() {
-        var APP_VERSION = 'bv-tasks-v7';
+        var APP_VERSION = 'bv-tasks-v9';
         try {
           var storedVersion = localStorage.getItem('__bv_tasks_cache_version__');
           if (storedVersion !== APP_VERSION) {
@@ -64,7 +64,7 @@
           setTimeout(function() {
             var rootEl = document.getElementById('root');
             if (rootEl && rootEl.childElementCount === 0) {
-              console.warn('[B V Tasks] Detectado root vazio. Limpando Service Workers e recarregando...');
+              console.warn('[B.V.S Special] Detectado root vazio. Limpando Service Workers e recarregando...');
               if ('serviceWorker' in navigator) {
                 navigator.serviceWorker.getRegistrations().then(function(regs) {
                   regs.forEach(function(r) { r.unregister(); });

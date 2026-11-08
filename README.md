@@ -1,4 +1,4 @@
-# B V Tasks 🍾🍷📖 — Executive Planner (Full Stack SQL + PWA iOS & Android)
+# B.V.S Special 🍾🍷📖 — Executive Planner (Full Stack SQL + PWA iOS & Android)
 
 Aplicação web progressiva (**PWA — Progressive Web App**) Full Stack com **Banco de Dados SQL (PostgreSQL)**, calendário executivo interativo, gerenciamento de pastas, captura com câmera do celular/PDFs, notificações nativas e sincronização multi-dispositivo real (**Computador ↔ iPhone ↔ Android**).
 

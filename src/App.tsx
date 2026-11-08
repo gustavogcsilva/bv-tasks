@@ -329,9 +329,9 @@ export function BVTasksApp() {
       )}
 
       <div className="safe-area-container mx-auto flex min-h-dvh w-full max-w-6xl flex-col">
-        {/* Cabeçalho Principal B V Tasks (Vermelho Vinho e Preto + Tipografia HIG + Claro/Escuro) */}
-        <header className="mb-6 flex flex-wrap items-center justify-between gap-3 pt-1">
-          <div className="flex items-center gap-2.5">
+      {/* Cabeçalho Principal B.V.S Special (Vermelho Vinho e Preto + Tipografia HIG + Claro/Escuro) */}
+        <header className="mb-5 sm:mb-6 flex flex-wrap items-center justify-between gap-2.5 sm:gap-3 pt-1">
+          <div className="flex flex-wrap items-center gap-2 sm:gap-2.5">
             <Logo size="md" showText />
 
             {/* Botão de Menu & Perfil (Idêntico no Celular e Computador) */}
@@ -339,7 +339,7 @@ export function BVTasksApp() {
               type="button"
               onClick={() => setIsMobileMenuOpen(true)}
               aria-label="Abrir Menu e Tarefas Importantes"
-              className="flex h-[40px] cursor-pointer items-center gap-2 rounded-xl border border-[#991B1B]/30 bg-white px-2.5 text-[12px] font-bold text-[#0F0F12] shadow-xs transition-all hover:border-[#991B1B] hover:shadow-md active:scale-95 dark:border-[#7F1D1D] dark:bg-[#1C1C22] dark:text-[#FAFAFA]"
+              className="flex h-[40px] cursor-pointer items-center gap-1.5 sm:gap-2 rounded-xl border border-[#991B1B]/30 bg-white px-2.5 text-[12px] font-bold text-[#0F0F12] shadow-xs transition-all hover:border-[#991B1B] hover:shadow-md active:scale-95 dark:border-[#7F1D1D] dark:bg-[#1C1C22] dark:text-[#FAFAFA]"
             >
               <span className="text-[14px]">☰</span>
               {currentUser.avatarUrl ? (
@@ -349,11 +349,11 @@ export function BVTasksApp() {
                   className="h-5 w-5 rounded-full object-cover"
                 />
               ) : (
-                <span className="flex h-5 w-5 items-center justify-center rounded-full bg-[#991B1B] text-[10px] text-white">
+                <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-[#991B1B] text-[10px] text-white">
                   {currentUser.name.charAt(0).toUpperCase()}
                 </span>
               )}
-              <span className="max-w-[85px] truncate sm:max-w-[140px]">{currentUser.name}</span>
+              <span className="max-w-[90px] truncate sm:max-w-[140px]">{currentUser.name}</span>
               {highPriorityCount > 0 && (
                 <span className="rounded-full bg-[#DC2626] px-1.5 py-0.5 text-[9px] font-black text-white">
                   ⭐ {highPriorityCount}
@@ -362,13 +362,13 @@ export function BVTasksApp() {
             </button>
           </div>
 
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="flex w-full sm:w-auto flex-wrap items-center justify-between sm:justify-end gap-2">
             {/* Indicador Interativo de Sincronização Mobile & Desktop (Online / Offline) */}
             <button
               type="button"
               onClick={() => setIsSyncModalOpen(true)}
               title="Clique para ver o status de sincronização no aparelho"
-              className={`flex h-[40px] cursor-pointer items-center gap-1.5 rounded-xl border px-3 text-[12px] font-bold transition-all active:scale-95 ${
+              className={`flex h-[40px] cursor-pointer items-center gap-1.5 rounded-xl border px-2.5 sm:px-3 text-[12px] font-bold transition-all active:scale-95 ${
                 isOnline
                   ? 'border-[#BBF7D0] bg-[#F0FDF4] text-[#15803D] hover:bg-[#DCFCE7] dark:border-[#14532D] dark:bg-[#0E2417] dark:text-[#86EFAC]'
                   : 'border-[#FED7AA] bg-[#FFF7ED] text-[#C2410C] hover:bg-[#FFEDD5] dark:border-[#7C2D12] dark:bg-[#25140F] dark:text-[#FDBA74]'
@@ -383,7 +383,7 @@ export function BVTasksApp() {
               type="button"
               onClick={toggleTheme}
               aria-label="Alternar tema claro ou escuro"
-              className="flex h-[40px] cursor-pointer items-center gap-1.5 rounded-xl border border-[#E5E4E0] bg-white px-3 text-[12px] font-bold text-[#0F0F12] transition-colors hover:bg-[#F1EFEA] active:scale-95 dark:border-[#27272A] dark:bg-[#141418] dark:text-[#FAFAFA]"
+              className="flex h-[40px] cursor-pointer items-center gap-1.5 rounded-xl border border-[#E5E4E0] bg-white px-2.5 sm:px-3 text-[12px] font-bold text-[#0F0F12] transition-colors hover:bg-[#F1EFEA] active:scale-95 dark:border-[#27272A] dark:bg-[#141418] dark:text-[#FAFAFA]"
             >
               <span>{theme === 'dark' ? '☀️ Claro' : '🌙 Escuro'}</span>
             </button>
@@ -393,7 +393,7 @@ export function BVTasksApp() {
               <button
                 type="button"
                 onClick={handleEnableNotifications}
-                className="flex h-[40px] cursor-pointer items-center gap-1.5 rounded-xl border border-[#FECACA] bg-[#FEF2F2] px-3 text-[12px] font-bold text-[#991B1B] transition-colors hover:bg-[#FEE2E2] active:scale-95 dark:border-[#7F1D1D] dark:bg-[#271518] dark:text-[#FCA5A5]"
+                className="flex h-[40px] cursor-pointer items-center gap-1.5 rounded-xl border border-[#FECACA] bg-[#FEF2F2] px-2.5 sm:px-3 text-[12px] font-bold text-[#991B1B] transition-colors hover:bg-[#FEE2E2] active:scale-95 dark:border-[#7F1D1D] dark:bg-[#271518] dark:text-[#FCA5A5]"
               >
                 🔔 Alertas
               </button>
@@ -403,7 +403,7 @@ export function BVTasksApp() {
               type="button"
               aria-label="Adicionar tarefa"
               onClick={() => setIsModalVisible(true)}
-              className="flex h-[44px] cursor-pointer items-center justify-center gap-1.5 rounded-[14px] bg-gradient-to-r from-[#0F0F12] via-[#450A0A] to-[#991B1B] px-4 text-[14px] font-bold text-white shadow-md shadow-[#7F1D1D]/25 transition-all hover:opacity-95 active:scale-95"
+              className="ml-auto sm:ml-0 flex h-[44px] cursor-pointer items-center justify-center gap-1.5 rounded-[14px] bg-gradient-to-r from-[#0F0F12] via-[#450A0A] to-[#991B1B] px-4 text-[14px] font-bold text-white shadow-md shadow-[#7F1D1D]/25 transition-all hover:opacity-95 active:scale-95"
             >
               <span className="text-[20px] leading-none font-normal">＋</span>
               <span>Nova tarefa</span>

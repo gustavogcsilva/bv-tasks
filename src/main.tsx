@@ -23,7 +23,7 @@ class RootErrorBoundary extends Component<{ children: ReactNode }, ErrorBoundary
   }
 
   componentDidCatch(error: Error, info: ErrorInfo) {
-    console.error('[B V Tasks ErrorBoundary]:', error, info);
+    console.error('[B.V.S Special ErrorBoundary]:', error, info);
   }
 
   handleResetAndReload = () => {
@@ -41,7 +41,7 @@ class RootErrorBoundary extends Component<{ children: ReactNode }, ErrorBoundary
       return (
         <div className="flex min-h-dvh w-full flex-col items-center justify-center bg-[#09090B] p-6 text-center text-white">
           <div className="max-w-md rounded-3xl border border-[#991B1B]/40 bg-[#141418] p-7 shadow-2xl">
-            <h1 className="font-serif text-2xl font-bold text-white">B V Tasks</h1>
+            <h1 className="font-serif text-2xl font-bold text-white">B.V.S Special</h1>
             <p className="mt-2 text-sm text-[#A1A1AA]">
               Detectamos dados antigos em cache no navegador. Clique abaixo para sincronizar a nova
               versão.

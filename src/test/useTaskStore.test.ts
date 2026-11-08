@@ -83,7 +83,7 @@ describe('useTaskStore — Autenticação (Google, E-mail, Recuperação), Tema 
 
     const ics = generateIcsContent([task]);
     expect(ics).toContain('BEGIN:VCALENDAR');
-    expect(ics).toContain('SUMMARY:[B V Tasks • Trabalho] Reunião Executiva B V');
+    expect(ics).toContain('SUMMARY:[B.V.S Special • Trabalho] Reunião Executiva B V');
     expect(ics).toContain('BEGIN:VALARM');
 
     const gcalUrl = getGoogleCalendarUrl(task);

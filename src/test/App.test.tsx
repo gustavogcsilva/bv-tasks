@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import App from '../App';
 import { useTaskStore } from '../stores/useTaskStore';
 
-describe('Integração da Interface B V Tasks PWA (Vinho & Preto, Claro/Escuro, Google Auth e Calendário)', () => {
+describe('Integração da Interface B.V.S Special PWA (Vinho & Preto, Claro/Escuro, Google Auth e Calendário)', () => {
   beforeEach(() => {
     window.localStorage.clear();
     useTaskStore.setState({
@@ -25,10 +25,10 @@ describe('Integração da Interface B V Tasks PWA (Vinho & Preto, Claro/Escuro, 
     });
   });
 
-  it('deve exibir a tela de autenticação com opção Google, Criar Conta e Esqueci a Senha, e entrar no app', async () => {
+  it('deve exibir a tela de autenticação com B.V.S Special, opção Google, Criar Conta e Esqueci a Senha, e entrar no app', async () => {
     render(<App />);
 
-    expect(screen.getByText('B V Tasks')).toBeInTheDocument();
+    expect(screen.getByText('B.V.S Special')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Continuar com o Google/i })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Esqueci a senha' })).toBeInTheDocument();
 
@@ -114,5 +114,48 @@ describe('Integração da Interface B V Tasks PWA (Vinho & Preto, Claro/Escuro, 
     fireEvent.click(screen.getByRole('button', { name: 'Excluir' }));
     fireEvent.click(screen.getByRole('button', { name: 'Confirmar exclusão' }));
     expect(useTaskStore.getState().tasks).toHaveLength(0);
+  });
+
+  it('deve auto-corrigir o horário com dois-pontos (:) ao digitar apenas números no celular ou computador', () => {
+    useTaskStore.setState({
+      currentUser: {
+        id: 'user-1',
+        name: 'Bruno V.',
+        email: 'bruno@bvtasks.com',
+        passwordHash: '123456',
+        recoveryKeyword: 'cabernet',
+        provider: 'email',
+        createdAt: '2026-11-07T00:00:00.000Z',
+      },
+    });
+
+    render(<App />);
+
+    expect(screen.getAllByText('B.V.S Special').length).toBeGreaterThanOrEqual(1);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Adicionar tarefa' }));
+    const dialog = screen.getByRole('dialog');
+
+    const titleInput = within(dialog).getByLabelText('Título');
+    const timeInput = within(dialog).getByLabelText('Horário') as HTMLInputElement;
+
+    fireEvent.change(titleInput, {
+      target: { value: 'Reunião Mobile Sem Dois Pontos' },
+    });
+
+    // Simula digitar "1430" sem os dois-pontos (como ocorre no teclado numérico mobile)
+    fireEvent.change(timeInput, {
+      target: { value: '1430' },
+    });
+    expect(timeInput.value).toBe('14:30');
+
+    // Simula digitar "930" -> deve auto-formatar para "09:30"
+    fireEvent.change(timeInput, {
+      target: { value: '930' },
+    });
+    expect(timeInput.value).toBe('09:30');
+
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Criar tarefa' }));
+    expect(useTaskStore.getState().tasks[0]?.time).toBe('09:30');
   });
 });

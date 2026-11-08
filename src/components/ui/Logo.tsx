@@ -20,7 +20,7 @@ export function Logo({ size = 'md', showText = true }: LogoProps) {
           className="h-full w-full p-1"
           fill="none"
           xmlns="http://www.w3.org/2000/svg"
-          aria-label="Logo B V Tasks — Garrafa de Vinho, Taça de Vinho, Livro e Iniciais B V"
+          aria-label="Logo B.V.S Special — Garrafa de Vinho, Taça de Vinho, Livro e Iniciais B V"
         >
           {/* Moldura circular executiva sutil */}
           <circle
@@ -108,8 +108,8 @@ export function Logo({ size = 'md', showText = true }: LogoProps) {
           <span className="text-[10px] font-extrabold tracking-[2px] text-[#991B1B] uppercase dark:text-[#F87171]">
             EXECUTIVE PLANNER
           </span>
-          <span className="text-[22px] leading-tight font-extrabold tracking-tight text-[#0F0F12] dark:text-[#FAFAFA]">
-            B V Tasks
+          <span className="text-[20px] sm:text-[22px] leading-tight font-extrabold tracking-tight text-[#0F0F12] dark:text-[#FAFAFA]">
+            B.V.S Special
           </span>
         </div>
       )}

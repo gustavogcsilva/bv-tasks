@@ -35,7 +35,7 @@ export async function requestNotificationPermission(): Promise<boolean> {
  * Usa ServiceWorkerRegistration.showNotification (compatível com Android e iOS PWA)
  * com fallback para o construtor Notification padrão.
  */
-export async function sendTaskNotification(task: Task, customPrefix = 'Lembrete B V Tasks'): Promise<boolean> {
+export async function sendTaskNotification(task: Task, customPrefix = 'Lembrete B.V.S Special'): Promise<boolean> {
   if (!isNotificationSupported()) return false;
 
   if (Notification.permission !== 'granted') {
@@ -109,16 +109,16 @@ export function generateIcsContent(tasks: Task[]): string {
       const dtStart = formatIcsDateTime(task.date, task.time, 0);
       const dtEnd = formatIcsDateTime(task.date, task.time, 60);
       const scopeLabel = SCOPE_CONFIG[task.scope]?.label ?? 'Tarefa';
-      const summary = escapeIcsText(`[B V Tasks • ${scopeLabel}] ${task.title}`);
+      const summary = escapeIcsText(`[B.V.S Special • ${scopeLabel}] ${task.title}`);
       const description = escapeIcsText(
         task.description
           ? `${task.description} (Prioridade: ${task.priority})`
-          : `Tarefa B V Tasks — Escopo: ${scopeLabel}`,
+          : `Tarefa B.V.S Special — Escopo: ${scopeLabel}`,
       );
 
       return [
         'BEGIN:VEVENT',
-        `UID:bv-tasks-${task.id}@bvtasks.app`,
+        `UID:bvs-special-${task.id}@bvtasks.app`,
         `DTSTAMP:${stamp}Z`,
         `DTSTART:${dtStart}`,
         `DTEND:${dtEnd}`,
@@ -127,7 +127,7 @@ export function generateIcsContent(tasks: Task[]): string {
         'BEGIN:VALARM',
         'TRIGGER:-PT15M',
         'ACTION:DISPLAY',
-        `DESCRIPTION:Lembrete B V Tasks: ${summary}`,
+        `DESCRIPTION:Lembrete B.V.S Special: ${summary}`,
         'END:VALARM',
         'END:VEVENT',
       ].join('\r\n');
@@ -137,7 +137,7 @@ export function generateIcsContent(tasks: Task[]): string {
   return [
     'BEGIN:VCALENDAR',
     'VERSION:2.0',
-    'PRODID:-//B V Tasks//Calendario e Tarefas//PT-BR',
+    'PRODID:-//B.V.S Special//Calendario e Tarefas//PT-BR',
     'CALSCALE:GREGORIAN',
     'METHOD:PUBLISH',
     events,
@@ -148,7 +148,7 @@ export function generateIcsContent(tasks: Task[]): string {
 /**
  * Exporta/Sincroniza uma ou mais tarefas abrindo o Calendário nativo do celular (.ics)
  */
-export function syncTasksWithPhoneCalendar(tasks: Task[], filename = 'bv-tasks-calendario.ics'): void {
+export function syncTasksWithPhoneCalendar(tasks: Task[], filename = 'bvs-special-calendario.ics'): void {
   if (tasks.length === 0 || typeof document === 'undefined') return;
 
   const icsContent = generateIcsContent(tasks);
@@ -172,9 +172,9 @@ export function getGoogleCalendarUrl(task: Task): string {
   const dtStart = formatIcsDateTime(task.date, task.time, 0);
   const dtEnd = formatIcsDateTime(task.date, task.time, 60);
   const scopeLabel = SCOPE_CONFIG[task.scope]?.label ?? 'Tarefa';
-  const title = encodeURIComponent(`[B V Tasks • ${scopeLabel}] ${task.title}`);
+  const title = encodeURIComponent(`[B.V.S Special • ${scopeLabel}] ${task.title}`);
   const details = encodeURIComponent(
-    task.description ?? `Tarefa criada no B V Tasks (${scopeLabel})`,
+    task.description ?? `Tarefa criada no B.V.S Special (${scopeLabel})`,
   );
 
   return `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${title}&dates=${dtStart}/${dtEnd}&details=${details}`;

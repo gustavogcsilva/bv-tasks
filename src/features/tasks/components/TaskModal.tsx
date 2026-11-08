@@ -36,6 +36,86 @@ const scopeOptions: { value: Scope; label: string; color: string }[] = [
   { value: 'study', label: SCOPE_CONFIG.study.label, color: SCOPE_CONFIG.study.color },
 ];
 
+/**
+ * Formata automaticamente o horário (HH:mm) com dois-pontos (:)
+ * quando o usuário digita apenas números no celular ou computador.
+ */
+export function formatTimeMask(raw: string, prevValue = ''): string {
+  // Se o usuário já digitou ou colou com ":", preserva apenas dígitos e um único ":"
+  if (raw.includes(':')) {
+    const cleaned = raw.replace(/[^\d:]/g, '');
+    const [hours = '', minutes = ''] = cleaned.split(':');
+    const h = hours.slice(0, 2);
+    const m = minutes.slice(0, 2);
+    // Se o usuário apagou os minutos e parou no ":", permite apagar o ":" ao pressionar Backspace
+    if (prevValue.endsWith(':') && cleaned === h && !raw.endsWith(':')) {
+      return h;
+    }
+    return m.length > 0 || raw.endsWith(':') ? `${h}:${m}` : h;
+  }
+
+  const digits = raw.replace(/\D/g, '').slice(0, 4);
+  if (digits.length === 0) return '';
+
+  // Se o usuário estiver apagando o ":" (ex: estava "14:" e apagou o ":")
+  if (prevValue.endsWith(':') && digits.length === 2 && raw.length < prevValue.length) {
+    return digits.slice(0, 1);
+  }
+
+  // Auto-completa 0 à esquerda se o 1º dígito for entre 3 e 9 (ex: "9" + "30" -> "09:30")
+  if (digits.length >= 2 && Number(digits[0]) > 2) {
+    const padded = `0${digits}`.slice(0, 4);
+    return `${padded.slice(0, 2)}:${padded.slice(2)}`;
+  }
+
+  if (digits.length <= 2) {
+    return digits;
+  }
+
+  return `${digits.slice(0, 2)}:${digits.slice(2)}`;
+}
+
+/**
+ * Formata automaticamente a data (AAAA-MM-DD) com hífens (-)
+ * quando o usuário digita apenas números no celular ou computador.
+ */
+export function formatDateMask(raw: string): string {
+  if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) return raw;
+  const digits = raw.replace(/\D/g, '').slice(0, 8);
+  if (digits.length <= 4) return digits;
+  if (digits.length <= 6) return `${digits.slice(0, 4)}-${digits.slice(4)}`;
+  return `${digits.slice(0, 4)}-${digits.slice(4, 6)}-${digits.slice(6, 8)}`;
+}
+
+/**
+ * Normaliza entradas rápidas de horário ao sair do campo ou enviar (ex: "9" -> "09:00", "930" -> "09:30", "14" -> "14:00")
+ */
+export function normalizeTimeOnSubmit(value: string): string {
+  const trimmed = value.trim();
+  if (!trimmed) return '';
+  if (/^([01]\d|2[0-3]):[0-5]\d$/.test(trimmed)) return trimmed;
+
+  const digits = trimmed.replace(/\D/g, '');
+  if (digits.length === 1) {
+    return `0${digits}:00`;
+  }
+  if (digits.length === 2) {
+    const h = Number(digits);
+    if (h >= 0 && h <= 23) return `${digits}:00`;
+  }
+  if (digits.length === 3) {
+    const h = `0${digits[0]}`;
+    const m = digits.slice(1, 3);
+    if (Number(m) <= 59) return `${h}:${m}`;
+  }
+  if (digits.length === 4) {
+    const h = digits.slice(0, 2);
+    const m = digits.slice(2, 4);
+    if (Number(h) <= 23 && Number(m) <= 59) return `${h}:${m}`;
+  }
+  return trimmed;
+}
+
 export function TaskModal({
   visible,
   selectedDate,
@@ -101,11 +181,25 @@ export function TaskModal({
     setAttachments((prev) => prev.filter((item) => item.id !== id));
   }
 
+  function handleTimeChange(nextRaw: string) {
+    setTime((prev) => formatTimeMask(nextRaw, prev));
+    if (error) setError('');
+  }
+
+  function handleDateChange(nextRaw: string) {
+    if (nextRaw.includes('-')) {
+      setDate(nextRaw.replace(/[^\d-]/g, '').slice(0, 10));
+    } else {
+      setDate(formatDateMask(nextRaw));
+    }
+    if (error) setError('');
+  }
+
   function handleSubmit(event?: FormEvent) {
     event?.preventDefault();
     const trimmedTitle = title.trim();
     const trimmedDate = date.trim();
-    const trimmedTime = time.trim();
+    const normalizedTime = normalizeTimeOnSubmit(time);
     const parsedDate = parse(trimmedDate, 'yyyy-MM-dd', new Date());
 
     if (!trimmedTitle) {
@@ -116,8 +210,8 @@ export function TaskModal({
       setError('Use uma data válida no formato AAAA-MM-DD.');
       return;
     }
-    if (trimmedTime && !/^([01]\d|2[0-3]):[0-5]\d$/.test(trimmedTime)) {
-      setError('Informe um horário válido no formato HH:mm.');
+    if (normalizedTime && !/^([01]\d|2[0-3]):[0-5]\d$/.test(normalizedTime)) {
+      setError('Informe um horário válido no formato HH:mm (ex.: 09:30 ou 14:00).');
       return;
     }
 
@@ -126,7 +220,7 @@ export function TaskModal({
         title: trimmedTitle,
         ...(description.trim() ? { description: description.trim() } : {}),
         date: trimmedDate,
-        ...(trimmedTime ? { time: trimmedTime } : {}),
+        ...(normalizedTime ? { time: normalizedTime } : {}),
         priority,
         scope,
         ...(folderId ? { folderId } : {}),
@@ -214,7 +308,8 @@ export function TaskModal({
               label="Data"
               type="text"
               inputMode="numeric"
-              onChangeText={setDate}
+              maxLength={10}
+              onChangeText={handleDateChange}
               placeholder="AAAA-MM-DD"
               value={date}
             />
@@ -222,8 +317,10 @@ export function TaskModal({
               label="Horário"
               type="text"
               inputMode="numeric"
-              onChangeText={setTime}
-              placeholder="HH:mm"
+              maxLength={5}
+              onChangeText={handleTimeChange}
+              onBlur={() => setTime((prev) => normalizeTimeOnSubmit(prev))}
+              placeholder="HH:mm (ex.: 14:30)"
               value={time}
             />
           </div>

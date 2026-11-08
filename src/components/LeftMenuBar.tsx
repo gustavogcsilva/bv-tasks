@@ -79,7 +79,7 @@ export function LeftMenuBar({
                     : 'bg-[#FEF2F2] text-[#991B1B] dark:bg-[#271518] dark:text-[#FCA5A5]'
                 }`}
               >
-                {currentUser.provider === 'google' ? 'Google' : 'B V Tasks'}
+                {currentUser.provider === 'google' ? 'Google' : 'B.V.S Special'}
               </span>
             </div>
             <span className="max-w-[190px] truncate text-[11px] font-medium text-[#71717A] dark:text-[#A1A1AA]">
