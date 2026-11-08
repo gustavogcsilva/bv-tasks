@@ -9,6 +9,7 @@ import {
   validatePassword,
   verifyGoogleJwt,
 } from '../../../services/authSecurity';
+import { apiRequestResetLink } from '../../../services/apiSync';
 import { useTaskStore } from '../../../stores/useTaskStore';
 
 type AuthMode = 'register' | 'login' | 'forgot' | 'google-direct';
@@ -18,6 +19,8 @@ export function AuthScreen() {
   const registeredAccounts = useTaskStore((state) => state.registeredAccounts);
   const theme = useTaskStore((state) => state.theme);
   const toggleTheme = useTaskStore((state) => state.toggleTheme);
+  const dbEngine = useTaskStore((state) => state.dbEngine);
+  const checkDatabaseHealth = useTaskStore((state) => state.checkDatabaseHealth);
   const registerAccount = useTaskStore((state) => state.registerAccount);
   const loginAccount = useTaskStore((state) => state.loginAccount);
   const loginWithGoogle = useTaskStore((state) => state.loginWithGoogle);
@@ -36,6 +39,7 @@ export function AuthScreen() {
   const [recoveryKeyword, setRecoveryKeyword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [generatedResetLink, setGeneratedResetLink] = useState<string | null>(null);
+  const [urlResetToken, setUrlResetToken] = useState<string | undefined>(undefined);
   const [isEmailResetStep2, setIsEmailResetStep2] = useState(false);
 
   // Estados para autenticação estilo conta de e-mail do Google (sem JWT)
@@ -98,6 +102,11 @@ export function AuthScreen() {
     };
   }, [loginWithGoogle, theme]);
 
+  // Verifica conexão com o servidor e banco de dados SQL ao abrir a tela de autenticação
+  useEffect(() => {
+    void checkDatabaseHealth();
+  }, [checkDatabaseHealth]);
+
   // Se o usuário abrir o link recebido no e-mail (?reset_token=...&email=...), abre direto a criação de nova senha
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -108,6 +117,7 @@ export function AuthScreen() {
       setMode('forgot');
       setRecoveryMethod('email');
       setEmail(emailParam);
+      setUrlResetToken(token);
       setIsEmailResetStep2(true);
       setSuccessMessage('Link validado com sucesso! Digite sua nova senha abaixo.');
     }
@@ -175,8 +185,24 @@ export function AuthScreen() {
       return;
     }
 
-    // Recuperação via Link por E-mail
+    // Recuperação via Link por E-mail (token HMAC assinado no servidor com fallback local)
     if (!isEmailResetStep2) {
+      const origin =
+        typeof window !== 'undefined' ? window.location.origin : 'https://bv-tasks.onrender.com';
+      const serverLink = await apiRequestResetLink(email, origin);
+      if (serverLink.ok && serverLink.resetLink) {
+        const parsed = new URL(serverLink.resetLink);
+        setUrlResetToken(parsed.searchParams.get('reset_token') || undefined);
+        setGeneratedResetLink(serverLink.resetLink);
+        setSuccessMessage(
+          `Link de redefinição seguro gerado para ${email.trim()}. Clique abaixo para definir sua nova senha.`,
+        );
+        return;
+      }
+      if (!serverLink.offline) {
+        setError(serverLink.error ?? 'E-mail não encontrado no banco SQL.');
+        return;
+      }
       const linkResult = requestPasswordResetLink(email);
       if (!linkResult.ok) {
         setError(linkResult.error ?? 'E-mail não encontrado no sistema.');
@@ -187,7 +213,7 @@ export function AuthScreen() {
         `Link de redefinição enviado para ${email.trim()}. Clique no link abaixo para criar sua nova senha.`,
       );
     } else {
-      const resetRes = await resetPasswordViaEmailLink(email, newPassword);
+      const resetRes = await resetPasswordViaEmailLink(email, newPassword, urlResetToken);
       if (!resetRes.ok) {
         setError(resetRes.error ?? 'Erro ao salvar nova senha.');
       }
@@ -598,10 +624,28 @@ export function AuthScreen() {
             </div>
           ) : null}
 
-          <div className="rounded-xl border border-[#E5E4E0] bg-[#F8F7F4] px-3.5 py-2.5 text-[12px] leading-relaxed text-[#3F3F46] dark:border-[#27272A] dark:bg-[#1C1C22] dark:text-[#A1A1AA]">
-            ✓ <strong>Acesso permanente e seguro:</strong> sua sessão fica autenticada e protegida
-            neste dispositivo com criptografia local e sincronização online.
-          </div>
+          {dbEngine === 'static-no-backend' ? (
+            <div className="rounded-xl border border-[#FED7AA] bg-[#FFF7ED] px-3.5 py-2.5 text-[12px] leading-relaxed text-[#9A3412] dark:border-[#7C2D12] dark:bg-[#25140F] dark:text-[#FDBA74]">
+              <strong>⚠️ Atenção (Modo Estático no Render):</strong> o serviço atual está publicado
+              como <em>Static Site</em> (sem servidor SQL ativo). Para que o login funcione em
+              qualquer celular e computador sem recriar conta, ative o{' '}
+              <strong>Web Service Node + PostgreSQL (DATABASE_URL)</strong> no painel do Render.
+            </div>
+          ) : (
+            <div className="rounded-xl border border-[#E5E4E0] bg-[#F8F7F4] px-3.5 py-2.5 text-[12px] leading-relaxed text-[#3F3F46] dark:border-[#27272A] dark:bg-[#1C1C22] dark:text-[#A1A1AA]">
+              {dbEngine === 'postgresql' ? (
+                <>
+                  🟢 <strong>Banco SQL PostgreSQL Conectado:</strong> sua conta e tarefas ficam
+                  salvas permanentemente e acessíveis em qualquer computador, iPhone ou Android.
+                </>
+              ) : (
+                <>
+                  ✓ <strong>Acesso seguro multi-dispositivo:</strong> sessão criptografada com
+                  sincronização SQL central e proteção offline local.
+                </>
+              )}
+            </div>
+          )}
 
           <Button type="submit" className="w-full">
             {mode === 'google-direct'

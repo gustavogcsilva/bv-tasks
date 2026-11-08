@@ -1,5 +1,9 @@
 node_modules/
 dist/
+data/
 .vite/
 .vercel/
 *.tsbuildinfo
+.env
+.env.*
+!.env.example

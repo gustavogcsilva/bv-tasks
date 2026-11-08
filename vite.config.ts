@@ -8,6 +8,9 @@ export default defineConfig({
   server: {
     host: '0.0.0.0',
     allowedHosts: true,
+    proxy: {
+      '/api': 'http://localhost:4173',
+    },
   },
   preview: {
     host: '0.0.0.0',
@@ -17,6 +20,6 @@ export default defineConfig({
     globals: true,
     environment: 'jsdom',
     setupFiles: './src/test/setup.ts',
-    include: ['src/**/*.{test,spec}.{ts,tsx}'],
+    include: ['src/**/*.{test,spec}.{ts,tsx,mjs}'],
   },
 });

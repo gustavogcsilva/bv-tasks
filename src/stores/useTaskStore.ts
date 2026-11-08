@@ -12,15 +12,26 @@ import type {
   UserAccount,
 } from '../features/tasks/types/task.types';
 import {
+  apiCheckHealth,
+  apiClearUserData,
+  apiDeleteFolder,
+  apiDeleteTask,
   apiGoogleAuth,
   apiLogin,
+  apiLogout,
   apiPullTasksAndFolders,
   apiPushTasksAndFolders,
   apiRegister,
   apiResetPassword,
-  setStoredToken,
+  apiUpsertFolder,
+  apiUpsertTask,
+  ensureCleanSlateMigration,
+  type DbEngineStatus,
 } from '../services/apiSync';
 import { generateId, safeLocalStorage } from '../services/storage';
+
+// Executa limpeza única de dados antigos/voláteis ao carregar a aplicação
+ensureCleanSlateMigration();
 
 export type ScopeFilter = 'all' | Scope;
 
@@ -30,29 +41,8 @@ const priorityRank: Record<Priority, number> = {
   low: 2,
 };
 
-const DEFAULT_FOLDERS: TaskFolder[] = [
-  {
-    id: 'folder-work-default',
-    name: 'Projetos & Clientes',
-    scope: 'work',
-    createdAt: '2026-01-01T00:00:00.000Z',
-  },
-  {
-    id: 'folder-study-default',
-    name: 'Leituras & Cursos',
-    scope: 'study',
-    createdAt: '2026-01-01T00:00:01.000Z',
-  },
-  {
-    id: 'folder-personal-default',
-    name: 'Rotina Pessoal',
-    scope: 'personal',
-    createdAt: '2026-01-01T00:00:02.000Z',
-  },
-];
-
 /**
- * Ordena as tarefas automaticamente com proteção contra dados legados:
+ * Ordena as tarefas automaticamente:
  * 1. Tarefas pendentes primeiro, concluídas por último
  * 2. Prioridade: Alta (high) > Média (medium) > Baixa (low)
  * 3. Horário definido (mais cedo primeiro)
@@ -78,6 +68,9 @@ export interface TaskStore {
   theme: ThemeMode;
   currentUser: UserAccount | null;
   registeredAccounts: UserAccount[];
+  pendingOfflineSync: boolean;
+  dbEngine: DbEngineStatus;
+  sqlPersistent: boolean;
   addTask: (draft: TaskDraft) => Task;
   toggleTask: (id: string) => void;
   deleteTask: (id: string) => void;
@@ -96,14 +89,18 @@ export interface TaskStore {
     email: string,
     password: string,
     recoveryKeyword?: string,
-  ) => Promise<{ ok: boolean; error?: string }>;
+  ) => Promise<{ ok: boolean; error?: string; backendMissing?: boolean }>;
   loginAccount: (
     email: string,
     password: string,
-  ) => Promise<{ ok: boolean; error?: string }>;
-  loginWithGoogle: (
-    googleProfile: { name: string; email: string; password?: string; avatarUrl?: string; googleId?: string },
-  ) => Promise<{ ok: boolean; account: UserAccount }>;
+  ) => Promise<{ ok: boolean; error?: string; backendMissing?: boolean }>;
+  loginWithGoogle: (googleProfile: {
+    name: string;
+    email: string;
+    password?: string;
+    avatarUrl?: string;
+    googleId?: string;
+  }) => Promise<{ ok: boolean; account: UserAccount; error?: string }>;
   resetPasswordWithKeyword: (
     email: string,
     keyword: string,
@@ -115,8 +112,11 @@ export interface TaskStore {
   resetPasswordViaEmailLink: (
     email: string,
     newPassword: string,
+    resetToken?: string,
   ) => Promise<{ ok: boolean; error?: string }>;
+  checkDatabaseHealth: () => Promise<void>;
   syncWithDatabase: () => Promise<void>;
+  clearAllUserData: () => Promise<void>;
   logoutAccount: () => void;
 }
 
@@ -124,13 +124,16 @@ export const useTaskStore = create<TaskStore>()(
   persist(
     (set, get) => ({
       tasks: [],
-      folders: DEFAULT_FOLDERS,
+      folders: [],
       selectedDate: format(new Date(), 'yyyy-MM-dd'),
       scopeFilter: 'all',
       selectedFolderId: 'all',
       theme: 'light',
       currentUser: null,
       registeredAccounts: [],
+      pendingOfflineSync: false,
+      dbEngine: 'offline',
+      sqlPersistent: false,
 
       addTask: (draft) => {
         const created: Task = {
@@ -141,55 +144,90 @@ export const useTaskStore = create<TaskStore>()(
         };
         const nextTasks = [...get().tasks, created];
         set({ tasks: nextTasks });
-        void apiPushTasksAndFolders(nextTasks, get().folders);
+
+        void apiUpsertTask(created).then((saved) => {
+          if (!saved) set({ pendingOfflineSync: true });
+        });
         return created;
       },
 
       toggleTask: (id) => {
-        const nextTasks = get().tasks.map((task) =>
-          task.id === id ? { ...task, isCompleted: !task.isCompleted } : task,
-        );
+        let updatedTask: Task | undefined;
+        const nextTasks = get().tasks.map((task) => {
+          if (task.id === id) {
+            updatedTask = { ...task, isCompleted: !task.isCompleted };
+            return updatedTask;
+          }
+          return task;
+        });
         set({ tasks: nextTasks });
-        void apiPushTasksAndFolders(nextTasks, get().folders);
+
+        if (updatedTask) {
+          void apiUpsertTask(updatedTask).then((saved) => {
+            if (!saved) set({ pendingOfflineSync: true });
+          });
+        }
       },
 
       deleteTask: (id) => {
         const nextTasks = get().tasks.filter((task) => task.id !== id);
         set({ tasks: nextTasks });
-        void apiPushTasksAndFolders(nextTasks, get().folders);
+        void apiDeleteTask(id);
       },
 
-      markTaskNotified: (id) =>
-        set((state) => ({
-          tasks: state.tasks.map((task) =>
-            task.id === id ? { ...task, notified: true } : task,
-          ),
-        })),
+      markTaskNotified: (id) => {
+        let updatedTask: Task | undefined;
+        const nextTasks = get().tasks.map((task) => {
+          if (task.id === id) {
+            updatedTask = { ...task, notified: true };
+            return updatedTask;
+          }
+          return task;
+        });
+        set({ tasks: nextTasks });
+        if (updatedTask) {
+          void apiUpsertTask(updatedTask);
+        }
+      },
 
       addAttachmentToTask: (taskId, attachment) => {
-        const nextTasks = get().tasks.map((task) =>
-          task.id === taskId
-            ? {
-                ...task,
-                attachments: [...(task.attachments ?? []), attachment],
-              }
-            : task,
-        );
+        let updatedTask: Task | undefined;
+        const nextTasks = get().tasks.map((task) => {
+          if (task.id === taskId) {
+            updatedTask = {
+              ...task,
+              attachments: [...(task.attachments ?? []), attachment],
+            };
+            return updatedTask;
+          }
+          return task;
+        });
         set({ tasks: nextTasks });
-        void apiPushTasksAndFolders(nextTasks, get().folders);
+        if (updatedTask) {
+          void apiUpsertTask(updatedTask).then((saved) => {
+            if (!saved) set({ pendingOfflineSync: true });
+          });
+        }
       },
 
       removeAttachmentFromTask: (taskId, attachmentId) => {
-        const nextTasks = get().tasks.map((task) =>
-          task.id === taskId
-            ? {
-                ...task,
-                attachments: (task.attachments ?? []).filter((a) => a.id !== attachmentId),
-              }
-            : task,
-        );
+        let updatedTask: Task | undefined;
+        const nextTasks = get().tasks.map((task) => {
+          if (task.id === taskId) {
+            updatedTask = {
+              ...task,
+              attachments: (task.attachments ?? []).filter((a) => a.id !== attachmentId),
+            };
+            return updatedTask;
+          }
+          return task;
+        });
         set({ tasks: nextTasks });
-        void apiPushTasksAndFolders(nextTasks, get().folders);
+        if (updatedTask) {
+          void apiUpsertTask(updatedTask).then((saved) => {
+            if (!saved) set({ pendingOfflineSync: true });
+          });
+        }
       },
 
       addFolder: (name, scope) => {
@@ -203,7 +241,9 @@ export const useTaskStore = create<TaskStore>()(
         };
         const nextFolders = [...get().folders, newFolder];
         set({ folders: nextFolders });
-        void apiPushTasksAndFolders(get().tasks, nextFolders);
+        void apiUpsertFolder(newFolder).then((saved) => {
+          if (!saved) set({ pendingOfflineSync: true });
+        });
         return newFolder;
       },
 
@@ -217,7 +257,7 @@ export const useTaskStore = create<TaskStore>()(
           selectedFolderId: get().selectedFolderId === id ? 'all' : get().selectedFolderId,
           tasks: nextTasks,
         });
-        void apiPushTasksAndFolders(nextTasks, nextFolders);
+        void apiDeleteFolder(id);
       },
 
       setSelectedDate: (selectedDate) => set({ selectedDate }),
@@ -247,36 +287,44 @@ export const useTaskStore = create<TaskStore>()(
           return { ok: false, error: 'A senha deve conter no mínimo 6 caracteres.' };
         }
 
-        // Tenta registrar primeiro no Banco de Dados Central para sincronização entre dispositivos
-        try {
-          const apiRes = await apiRegister(
-            trimmedName,
-            normalizedEmail,
-            normalizedPassword,
-            normalizedKeyword,
-          );
-          if (apiRes.ok && apiRes.user) {
-            const user = apiRes.user;
-            set((state) => ({
-              registeredAccounts: [
-                ...state.registeredAccounts.filter((a) => a.email !== normalizedEmail),
-                user,
-              ],
-              currentUser: user,
-            }));
-            return { ok: true };
-          } else if (apiRes.error && !apiRes.offline) {
-            return { ok: false, error: apiRes.error };
-          }
-        } catch {
-          // Continua para salvamento local resiliente
+        // 1. Autentica / Registra no Banco de Dados SQL Central
+        const apiRes = await apiRegister(
+          trimmedName,
+          normalizedEmail,
+          normalizedPassword,
+          normalizedKeyword,
+        );
+
+        if (apiRes.ok && apiRes.user) {
+          const user = apiRes.user;
+          set((state) => ({
+            currentUser: user,
+            tasks: apiRes.tasks ?? [],
+            folders: apiRes.folders ?? [],
+            pendingOfflineSync: false,
+            registeredAccounts: [
+              ...state.registeredAccounts.filter((a) => a.email !== normalizedEmail),
+              user,
+            ],
+          }));
+          void get().checkDatabaseHealth();
+          return { ok: true };
         }
 
+        if (!apiRes.offline) {
+          return { ok: false, error: apiRes.error };
+        }
+
+        if (apiRes.backendMissing) {
+          set({ dbEngine: 'static-no-backend', sqlPersistent: false });
+        }
+
+        // 2. Fallback offline local (apenas quando sem conexão de rede ou testes locais)
         const existing = get().registeredAccounts.find((a) => a.email === normalizedEmail);
         if (existing) {
           if (existing.passwordHash === normalizedPassword) {
             set({ currentUser: existing });
-            return { ok: true };
+            return { ok: true, backendMissing: apiRes.backendMissing };
           }
           return { ok: false, error: 'Este e-mail já possui conta cadastrada. Faça login.' };
         }
@@ -294,41 +342,57 @@ export const useTaskStore = create<TaskStore>()(
         set((state) => ({
           registeredAccounts: [...state.registeredAccounts, newAccount],
           currentUser: newAccount,
+          tasks: [],
+          folders: [],
         }));
 
-        return { ok: true };
+        return { ok: true, backendMissing: apiRes.backendMissing };
       },
 
       loginAccount: async (email, password) => {
         const normalizedEmail = email.trim().toLowerCase();
         const normalizedPassword = password.trim();
 
-        // 1. Tenta autenticar no Banco de Dados Central (para celular e computador sincronizados)
-        try {
-          const apiRes = await apiLogin(normalizedEmail, normalizedPassword);
-          if (apiRes.ok && apiRes.user) {
-            const user = apiRes.user;
-            set((state) => ({
-              currentUser: user,
-              registeredAccounts: [
-                ...state.registeredAccounts.filter((a) => a.email !== normalizedEmail),
-                user,
-              ],
-            }));
-            void get().syncWithDatabase();
-            return { ok: true };
-          } else if (apiRes.error && !apiRes.offline) {
-            return { ok: false, error: apiRes.error };
-          }
-        } catch {
-          // Fallback para cache local
+        // 1. Login no Banco de Dados SQL Central (permite acessar de qualquer dispositivo)
+        const apiRes = await apiLogin(normalizedEmail, normalizedPassword);
+        if (apiRes.ok && apiRes.user) {
+          const user = apiRes.user;
+          set((state) => ({
+            currentUser: user,
+            tasks: apiRes.tasks ?? [],
+            folders: apiRes.folders ?? [],
+            pendingOfflineSync: false,
+            registeredAccounts: [
+              ...state.registeredAccounts.filter((a) => a.email !== normalizedEmail),
+              user,
+            ],
+          }));
+          void get().checkDatabaseHealth();
+          return { ok: true };
+        }
+
+        if (!apiRes.offline) {
+          return { ok: false, error: apiRes.error };
+        }
+
+        if (apiRes.backendMissing) {
+          set({ dbEngine: 'static-no-backend', sqlPersistent: false });
         }
 
         // 2. Fallback offline local
         const account = get().registeredAccounts.find((a) => a.email === normalizedEmail);
         if (!account || account.passwordHash !== normalizedPassword) {
+          if (apiRes.backendMissing) {
+            return {
+              ok: false,
+              backendMissing: true,
+              error:
+                'Servidor SQL ainda não conectado no Render (serviço atual está como Static Site). Ative o Web Service + PostgreSQL no Render para login entre dispositivos.',
+            };
+          }
           return { ok: false, error: 'E-mail ou senha incorretos.' };
         }
+
         set({ currentUser: account });
         return { ok: true };
       },
@@ -340,6 +404,7 @@ export const useTaskStore = create<TaskStore>()(
         if (!email || !email.includes('@')) {
           return {
             ok: false,
+            error: 'E-mail Google inválido.',
             account: {
               id: '',
               name: '',
@@ -350,29 +415,46 @@ export const useTaskStore = create<TaskStore>()(
           };
         }
 
-        // Tenta autenticar no banco de dados central
-        try {
-          const apiRes = await apiGoogleAuth({
-            email,
-            name,
-            password: googleProfile.password,
-            avatarUrl: googleProfile.avatarUrl,
-            googleId: googleProfile.googleId,
-          });
-          if (apiRes.ok && apiRes.user) {
-            const user = apiRes.user;
-            set((state) => ({
-              currentUser: user,
-              registeredAccounts: [
-                ...state.registeredAccounts.filter((a) => a.email !== email),
-                user,
-              ],
-            }));
-            void get().syncWithDatabase();
-            return { ok: true, account: user };
-          }
-        } catch {
-          // Fallback offline
+        const apiRes = await apiGoogleAuth({
+          email,
+          name,
+          password: googleProfile.password,
+          avatarUrl: googleProfile.avatarUrl,
+          googleId: googleProfile.googleId,
+        });
+
+        if (apiRes.ok && apiRes.user) {
+          const user = apiRes.user;
+          set((state) => ({
+            currentUser: user,
+            tasks: apiRes.tasks ?? [],
+            folders: apiRes.folders ?? [],
+            pendingOfflineSync: false,
+            registeredAccounts: [
+              ...state.registeredAccounts.filter((a) => a.email !== email),
+              user,
+            ],
+          }));
+          void get().checkDatabaseHealth();
+          return { ok: true, account: user };
+        }
+
+        if (!apiRes.offline) {
+          return {
+            ok: false,
+            error: apiRes.error,
+            account: {
+              id: '',
+              name: '',
+              email: '',
+              passwordHash: '',
+              createdAt: '',
+            },
+          };
+        }
+
+        if (apiRes.backendMissing) {
+          set({ dbEngine: 'static-no-backend', sqlPersistent: false });
         }
 
         const existing = get().registeredAccounts.find((a) => a.email === email);
@@ -396,7 +478,7 @@ export const useTaskStore = create<TaskStore>()(
           id: generateId(),
           name,
           email,
-          passwordHash: `google-oauth-${generateId()}`,
+          passwordHash: googleProfile.password?.trim() || `google-oauth-${generateId()}`,
           recoveryKeyword: 'google',
           provider: 'google',
           avatarUrl: googleProfile.avatarUrl,
@@ -407,6 +489,8 @@ export const useTaskStore = create<TaskStore>()(
         set((state) => ({
           registeredAccounts: [...state.registeredAccounts, googleAccount],
           currentUser: googleAccount,
+          tasks: [],
+          folders: [],
         }));
 
         return { ok: true, account: googleAccount };
@@ -427,24 +511,28 @@ export const useTaskStore = create<TaskStore>()(
           return { ok: false, error: 'A nova senha deve ter pelo menos 6 caracteres.' };
         }
 
-        try {
-          const apiRes = await apiResetPassword({
-            email: normalizedEmail,
-            keyword: normalizedKeyword,
-            newPassword: normalizedNewPass,
-          });
-          if (apiRes.ok && apiRes.user) {
-            set((state) => ({
-              currentUser: apiRes.user,
-              registeredAccounts: [
-                ...state.registeredAccounts.filter((a) => a.email !== normalizedEmail),
-                apiRes.user!,
-              ],
-            }));
-            return { ok: true };
-          }
-        } catch {
-          // Fallback offline
+        const apiRes = await apiResetPassword({
+          email: normalizedEmail,
+          keyword: normalizedKeyword,
+          newPassword: normalizedNewPass,
+        });
+
+        if (apiRes.ok && apiRes.user) {
+          set((state) => ({
+            currentUser: apiRes.user,
+            tasks: apiRes.tasks ?? [],
+            folders: apiRes.folders ?? [],
+            pendingOfflineSync: false,
+            registeredAccounts: [
+              ...state.registeredAccounts.filter((a) => a.email !== normalizedEmail),
+              apiRes.user!,
+            ],
+          }));
+          return { ok: true };
+        }
+
+        if (!apiRes.offline) {
+          return { ok: false, error: apiRes.error };
         }
 
         const account = get().registeredAccounts.find((a) => a.email === normalizedEmail);
@@ -482,32 +570,36 @@ export const useTaskStore = create<TaskStore>()(
         return { ok: true, resetLink };
       },
 
-      resetPasswordViaEmailLink: async (email, newPassword) => {
+      resetPasswordViaEmailLink: async (email, newPassword, resetToken) => {
         const normalizedEmail = email.trim().toLowerCase();
         const normalizedNewPass = newPassword.trim();
         if (normalizedNewPass.length < 6) {
           return { ok: false, error: 'A nova senha deve ter pelo menos 6 caracteres.' };
         }
 
-        try {
-          const token = btoa(encodeURIComponent(normalizedEmail));
-          const apiRes = await apiResetPassword({
-            email: normalizedEmail,
-            token,
-            newPassword: normalizedNewPass,
-          });
-          if (apiRes.ok && apiRes.user) {
-            set((state) => ({
-              currentUser: apiRes.user,
-              registeredAccounts: [
-                ...state.registeredAccounts.filter((a) => a.email !== normalizedEmail),
-                apiRes.user!,
-              ],
-            }));
-            return { ok: true };
-          }
-        } catch {
-          // Fallback offline
+        const token = resetToken || btoa(encodeURIComponent(normalizedEmail));
+        const apiRes = await apiResetPassword({
+          email: normalizedEmail,
+          token,
+          newPassword: normalizedNewPass,
+        });
+
+        if (apiRes.ok && apiRes.user) {
+          set((state) => ({
+            currentUser: apiRes.user,
+            tasks: apiRes.tasks ?? [],
+            folders: apiRes.folders ?? [],
+            pendingOfflineSync: false,
+            registeredAccounts: [
+              ...state.registeredAccounts.filter((a) => a.email !== normalizedEmail),
+              apiRes.user!,
+            ],
+          }));
+          return { ok: true };
+        }
+
+        if (!apiRes.offline) {
+          return { ok: false, error: apiRes.error };
         }
 
         const account = get().registeredAccounts.find((a) => a.email === normalizedEmail);
@@ -527,47 +619,68 @@ export const useTaskStore = create<TaskStore>()(
         return { ok: true };
       },
 
+      checkDatabaseHealth: async () => {
+        const health = await apiCheckHealth();
+        set({
+          dbEngine: health.engine,
+          sqlPersistent: health.sqlPersistent,
+        });
+      },
+
       syncWithDatabase: async () => {
-        const currentUser = get().currentUser;
-        if (!currentUser) return;
+        const user = get().currentUser;
+        if (!user) return;
 
-        try {
-          const pullRes = await apiPullTasksAndFolders();
-          if (pullRes.ok && pullRes.tasks && pullRes.folders) {
-            const serverTaskMap = new Map(pullRes.tasks.map((t) => [t.id, t]));
-            for (const lt of get().tasks) {
-              if (!serverTaskMap.has(lt.id)) {
-                serverTaskMap.set(lt.id, lt);
-              }
-            }
-            const mergedTasks = Array.from(serverTaskMap.values());
+        await get().checkDatabaseHealth();
 
-            const serverFolderMap = new Map(pullRes.folders.map((f) => [f.id, f]));
-            for (const lf of get().folders) {
-              if (!serverFolderMap.has(lf.id)) {
-                serverFolderMap.set(lf.id, lf);
-              }
-            }
-            const mergedFolders = Array.from(serverFolderMap.values());
-
-            set({ tasks: mergedTasks, folders: mergedFolders });
-            await apiPushTasksAndFolders(mergedTasks, mergedFolders);
-          } else {
-            await apiPushTasksAndFolders(get().tasks, get().folders);
+        // Se havia alterações feitas enquanto offline, envia primeiro para o SQL
+        if (get().pendingOfflineSync) {
+          const pushRes = await apiPushTasksAndFolders(get().tasks, get().folders);
+          if (pushRes.ok) {
+            set({
+              tasks: pushRes.tasks ?? get().tasks,
+              folders: pushRes.folders ?? get().folders,
+              pendingOfflineSync: false,
+            });
+            return;
           }
-        } catch {
-          // Fallback offline silencioso
+        }
+
+        // Busca o estado oficial atualizado do Banco SQL
+        const pullRes = await apiPullTasksAndFolders();
+        if (pullRes.ok) {
+          set({
+            tasks: pullRes.tasks ?? [],
+            folders: pullRes.folders ?? [],
+            pendingOfflineSync: false,
+          });
         }
       },
 
+      clearAllUserData: async () => {
+        set({
+          tasks: [],
+          folders: [],
+          selectedFolderId: 'all',
+          pendingOfflineSync: false,
+        });
+        await apiClearUserData();
+      },
+
       logoutAccount: () => {
-        setStoredToken(null);
-        set({ currentUser: null });
+        void apiLogout();
+        set({
+          currentUser: null,
+          tasks: [],
+          folders: [],
+          selectedFolderId: 'all',
+          pendingOfflineSync: false,
+        });
       },
     }),
     {
-      name: 'bv-tasks-storage',
-      version: 2,
+      name: 'bv-tasks-sql-v8',
+      version: 8,
       storage: createJSONStorage(() => safeLocalStorage),
       merge: (persistedState, currentState) => {
         const raw = (persistedState as Partial<TaskStore> | undefined) ?? {};
@@ -578,8 +691,8 @@ export const useTaskStore = create<TaskStore>()(
 
         return {
           ...currentState,
-          tasks: Array.isArray(raw.tasks) ? raw.tasks : currentState.tasks,
-          folders: Array.isArray(raw.folders) ? raw.folders : currentState.folders,
+          tasks: Array.isArray(raw.tasks) ? raw.tasks : [],
+          folders: Array.isArray(raw.folders) ? raw.folders : [],
           selectedDate: validDate,
           scopeFilter:
             raw.scopeFilter === 'work' ||
@@ -594,6 +707,7 @@ export const useTaskStore = create<TaskStore>()(
           currentUser:
             raw.currentUser && typeof raw.currentUser.name === 'string' ? raw.currentUser : null,
           registeredAccounts: Array.isArray(raw.registeredAccounts) ? raw.registeredAccounts : [],
+          pendingOfflineSync: Boolean(raw.pendingOfflineSync),
         };
       },
       partialize: (state) => ({
@@ -605,6 +719,7 @@ export const useTaskStore = create<TaskStore>()(
         theme: state.theme,
         currentUser: state.currentUser,
         registeredAccounts: state.registeredAccounts,
+        pendingOfflineSync: state.pendingOfflineSync,
       }),
     },
   ),

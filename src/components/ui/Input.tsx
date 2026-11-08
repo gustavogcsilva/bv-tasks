@@ -4,7 +4,6 @@ interface BaseInputProps {
   label: string;
   onChangeText?: (value: string) => void;
   multiline?: boolean;
-  type?: string;
 }
 
 type SingleLineProps = BaseInputProps &
@@ -15,6 +14,7 @@ type SingleLineProps = BaseInputProps &
 type MultiLineProps = BaseInputProps &
   TextareaHTMLAttributes<HTMLTextAreaElement> & {
     multiline: true;
+    type?: never;
   };
 
 export type InputProps = SingleLineProps | MultiLineProps;

@@ -44,6 +44,8 @@ export function BVTasksApp() {
   const currentUser = useTaskStore((state) => state.currentUser);
   const logoutAccount = useTaskStore((state) => state.logoutAccount);
   const syncWithDatabase = useTaskStore((state) => state.syncWithDatabase);
+  const clearAllUserData = useTaskStore((state) => state.clearAllUserData);
+  const dbEngine = useTaskStore((state) => state.dbEngine);
 
   const tasks = useTaskStore((state) => state.tasks);
   const folders = useTaskStore((state) => state.folders);
@@ -89,11 +91,23 @@ export function BVTasksApp() {
     }
   }, [theme]);
 
-  // Sincroniza com o banco de dados central (cross-device) ao logar ou abrir a aplicação
+  // Sincroniza com o banco SQL central (cross-device) ao logar, abrir ou voltar para o aplicativo
   useEffect(() => {
-    if (currentUser) {
-      void syncWithDatabase();
-    }
+    if (!currentUser) return;
+    void syncWithDatabase();
+
+    const handleVisibilityOrFocus = () => {
+      if (typeof document === 'undefined' || document.visibilityState === 'visible') {
+        void syncWithDatabase();
+      }
+    };
+
+    window.addEventListener('focus', handleVisibilityOrFocus);
+    document.addEventListener('visibilitychange', handleVisibilityOrFocus);
+    return () => {
+      window.removeEventListener('focus', handleVisibilityOrFocus);
+      document.removeEventListener('visibilitychange', handleVisibilityOrFocus);
+    };
   }, [currentUser, syncWithDatabase]);
 
   // Monitoramento de conectividade para avisos e sincronização automática
@@ -607,6 +621,29 @@ export function BVTasksApp() {
 
                 <div className="flex justify-between">
                   <span className="font-semibold text-[#71717A] dark:text-[#A1A1AA]">
+                    Banco SQL Central:
+                  </span>
+                  <span
+                    className={`font-bold ${
+                      dbEngine === 'postgresql'
+                        ? 'text-[#16A34A] dark:text-[#86EFAC]'
+                        : dbEngine === 'local-file'
+                          ? 'text-[#2563EB] dark:text-[#60A5FA]'
+                          : 'text-[#EA580C] dark:text-[#FDBA74]'
+                    }`}
+                  >
+                    {dbEngine === 'postgresql'
+                      ? 'PostgreSQL Conectado'
+                      : dbEngine === 'local-file'
+                        ? 'Servidor Ativo (Sem DATABASE_URL)'
+                        : dbEngine === 'static-no-backend'
+                          ? 'Static Site (Ative Web Service + SQL)'
+                          : 'Modo Local Offline'}
+                  </span>
+                </div>
+
+                <div className="flex justify-between">
+                  <span className="font-semibold text-[#71717A] dark:text-[#A1A1AA]">
                     Integridade Local:
                   </span>
                   <span className="font-bold text-[#16A34A] dark:text-[#86EFAC]">
@@ -632,7 +669,7 @@ export function BVTasksApp() {
                   className="flex min-h-[46px] w-full cursor-pointer items-center justify-center gap-2 rounded-xl bg-[#991B1B] px-4 text-[13px] font-bold text-white shadow-md shadow-[#991B1B]/20 transition-all hover:bg-[#7F1D1D] active:scale-[0.99] disabled:opacity-75"
                 >
                   <span className={isSyncing ? 'animate-sync-spin' : ''}>🔄</span>
-                  <span>{isSyncing ? 'Sincronizando tarefas...' : 'Sincronizar Agora'}</span>
+                  <span>{isSyncing ? 'Sincronizando com o SQL...' : 'Sincronizar Agora'}</span>
                 </button>
 
                 <button
@@ -645,6 +682,18 @@ export function BVTasksApp() {
                   className="flex min-h-[44px] w-full cursor-pointer items-center justify-center gap-2 rounded-xl border border-[#D6D3CD] bg-white px-4 text-[13px] font-bold text-[#0F0F12] transition-all hover:bg-[#F8F7F4] active:scale-[0.99] dark:border-[#2E2E34] dark:bg-[#1C1C22] dark:text-[#FAFAFA]"
                 >
                   <span>📅 Exportar Todas as Tarefas (.ics do Celular)</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={async () => {
+                    await clearAllUserData();
+                    setIsSyncModalOpen(false);
+                    showToast('🧹 Todas as tarefas e pastas foram limpas com sucesso!', 'info');
+                  }}
+                  className="flex min-h-[42px] w-full cursor-pointer items-center justify-center gap-2 rounded-xl border border-[#FECACA] bg-[#FEF2F2] px-4 text-[12px] font-bold text-[#991B1B] transition-all hover:bg-[#FEE2E2] active:scale-[0.99] dark:border-[#7F1D1D] dark:bg-[#271518] dark:text-[#FCA5A5]"
+                >
+                  <span>🧹 Limpar Todas as Tarefas e Pastas</span>
                 </button>
               </div>
             </div>

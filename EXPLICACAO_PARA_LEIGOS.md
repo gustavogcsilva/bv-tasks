@@ -1,57 +1,51 @@
-# 📖 Guia Simples: Tudo o que foi feito no B V Tasks
+# 📖 Guia Simples: Como Funciona o Banco SQL e o Login em Qualquer Aparelho
 
-Este guia foi feito com linguagem clara e simples para que qualquer pessoa entenda todas as novidades e melhorias que foram adicionadas no aplicativo **B V Tasks**.
-
----
-
-## 1. Banco de Dados Centralizado (Computador e Celular Conectados) 🌐💾
-
-- **O Problema que Existia Antes:**
-  - Antes, quando você criava uma conta no computador, os dados ficavam guardados apenas na memória daquele navegador específico. Quando você abria o celular, o aplicativo dizia "senha incorreta" ou pedia para criar a conta de novo, porque o celular ainda não conhecia a conta feita no computador.
-- **A Solução Implementada:**
-  - Criamos um **banco de dados real e centralizado no servidor do Render** (`server.mjs`).
-  - Agora, ao criar sua conta no computador, ela fica imediatamente salva no banco central. Quando você abre o celular, a mesma conta e senha funcionam perfeitamente!
-  - **Sincronização Automática:** Todas as tarefas e pastas que você criar no computador aparecem no celular, e o que você fizer no celular aparece no computador.
-  - **Continua Funcionando Offline:** Se o sinal do celular cair ou se o servidor estiver reiniciando, o aplicativo não quebra: ele guarda tudo no aparelho e, assim que a internet voltar, envia tudo para o banco central com total segurança.
+Este guia explica de forma simples por que o login antes funcionava apenas em um aparelho, o que foi corrigido no código e como ligar o **Banco de Dados SQL** para salvar tudo para sempre.
 
 ---
 
-## 2. Correção de "Senha Incorreta" no Celular 📱🔑
+## 1. Por que antes parecia um "Login Volátil" (só funcionava onde foi criado)? 🤔
 
-- **Por que a senha dava incorreta no celular?**
-  - Os teclados inteligentes dos celulares (tanto no iPhone quanto no Android) têm o hábito de colocar a **primeira letra em maiúscula** automaticamente, além de ativar o corretor de texto e às vezes inserir um espaço no final. Por isso, a senha digitada no celular ficava diferente da criada no computador.
-- **O que foi corrigido:**
-  - Desativamos a maiúscula automática (`autocapitalize="none"`) e o corretor ortográfico nos campos de e-mail e senha.
-  - O sistema agora limpa espaços invisíveis no início ou fim do texto.
-  - **Botão de Ver a Senha (Ícone do Olho):** Adicionamos o botão `👁️ Ver senha` para que você possa ver exatamente o que está digitando no celular antes de clicar em entrar.
+Existiam **dois motivos técnicos** na hospedagem do Render:
 
----
-
-## 3. Barra de Menu Lateral Idêntica no Celular e no Computador 👤⭐
-
-- **Mesmo Menu em Qualquer Tela:**
-  - O menu e a navegação agora são 100% idênticos e responsivos tanto no celular quanto no computador.
-  - No topo da tela (ao lado da logo), existe sempre o botão oficial:
-    `☰ [Sua Foto/Inicial] [Seu Nome] ⭐ [Qtd de Tarefas Importantes]`
-  - Ao clicar nele no computador ou tocar nele no celular, abre-se a gaveta lateral com:
-    1. **Quem Está Logado:** Seu nome, sua foto ou inicial, seu e-mail, o selo da conta (`Google` ou `B V Tasks`) e o botão para **Sair**.
-    2. **Mini Status Bar:** Uma barra de progresso visual com a porcentagem do seu dia concluída, e 3 caixas com o total de tarefas criadas, tarefas importantes e tarefas prontas.
-    3. **Tarefas Importantes:** Lista com todas as tarefas de Alta Prioridade, mostrando o título, a data, o horário, a cor (Vinho para Trabalho, Azul para Pessoal, Rosa para Estudo) e o texto **"O que ela faz"** detalhando o objetivo da tarefa.
-    4. **Clique Direto:** Clicando em qualquer tarefa da lista, o aplicativo vai direto para o dia dela no calendário e faz ela piscar suavemente na tela.
+1. **O site estava publicado como "Static Site" (Site Estático):**
+   - Um *Static Site* serve apenas as telas visuais (como um folheto digital) — ele **não liga o motor do servidor** (`server.mjs`). Por isso, quando você criava uma conta no computador, ela ficava guardada apenas dentro do navegador daquele computador. Ao abrir o celular, o celular não sabia que aquela conta existia!
+2. **Sim, você precisa de um Banco de Dados SQL (`PostgreSQL`):**
+   - No plano gratuito do Render, arquivos comuns salvos em pasta são apagados toda vez que o servidor descansa por 15 minutos.
+   - Já um **Banco de Dados SQL (PostgreSQL)** funciona como um **cofre permanente na nuvem**: você cria sua conta uma única vez (no computador ou no celular) e entra direto de qualquer outro aparelho usando o mesmo e-mail e senha!
 
 ---
 
-## 4. Segurança de Nível Bancário e Sigilo dos Seus Dados 🛡️🔒
+## 2. Tudo o que já deixamos 100% pronto e limpo para você 🧹✨
 
-- As tarefas e senhas são dados sigilosos e confidenciais. Por isso, implementamos as mais rigorosas práticas de segurança da engenharia de software:
-  - **Criptografia Forte (PBKDF2 com SHA-512):** Nenhuma senha é salva como texto puro. Cada senha recebe um código aleatório exclusivo (*salt*) e é transformada em uma chave criptográfica irreversível.
-  - **Proteção contra Ataques de Tempo (`timingSafeEqual`):** A verificação de senhas é feita com comparação em tempo constante, impedindo que hackers descubram caracteres da senha medindo o tempo de resposta do servidor.
-  - **Isolamento de Contas:** As suas tarefas só podem ser lidas e alteradas por você mesmo através do seu token de segurança exclusivo. Ninguém mais tem acesso aos seus dados.
-  - **Sem Acesso Convidado:** Não permitimos nenhum tipo de entrada anônima ou não verificada. Apenas contas reais autenticadas conseguem acessar as tarefas.
+1. **Limpeza Completa de Dados Antigos:**
+   - Todos os cadastros antigos de teste, tarefas anteriores e pastas pré-criadas foram **100% zerados e limpos**. Ao abrir o aplicativo atualizado, ele remove automaticamente os dados velhos do navegador.
+   - Também adicionamos um botão **"🧹 Limpar Todas as Tarefas e Pastas"** dentro da **Central de Sincronização** caso você queira zerar sua agenda a qualquer momento.
+2. **Motor SQL PostgreSQL Criado (`server.mjs` + `database/schema.sql`):**
+   - Você **não precisa escrever nenhum comando SQL**! Assim que conectar o banco PostgreSQL, o sistema cria sozinho as 4 tabelas oficiais (`bv_users`, `bv_sessions`, `bv_folders` e `bv_tasks`).
+3. **Detector Inteligente na Tela de Login:**
+   - A própria tela de login agora avisa com transparência quando o **🟢 Banco SQL PostgreSQL está Conectado** ou quando o Render ainda está em modo estático.
+4. **Sincronização em Tempo Real entre Celular e Computador:**
+   - Criou, concluiu ou apagou uma tarefa no celular? Ao olhar para o computador, a agenda atualiza automaticamente!
 
 ---
 
-## 5. Como o Aplicativo Roda no Render 🚀
+## 3. Como Ativar seu Banco SQL Gratuito em 3 Minutos 🚀
 
-- Atualizamos a configuração do Render (`render.yaml`) para rodar como um serviço web Node.js completo.
-- O servidor cuida de entregar o aplicativo de forma ultra-rápida, processa as chamadas de banco de dados e mantém a PWA funcionando como um aplicativo nativo no seu iPhone e Android!
+### Jeito 1 — Mais Rápido (Tudo dentro do próprio Render via Blueprint):
+1. Entre no painel do **Render** (`dashboard.render.com`).
+2. Se quiser substituir o site estático antigo, apague o *Static Site* anterior e clique no botão **New +** → **Blueprint**.
+3. Escolha o seu repositório **`bv-tasks`**.
+4. Clique em **Apply**: o Render vai criar sozinho o **Servidor Node** + o **Banco SQL PostgreSQL** já interligados!
+*(Observação: o banco PostgreSQL gratuito do Render dura 30 dias no plano free; se quiser um banco gratuito para sempre sem prazo, use o Jeito 2 abaixo!)*
+
+### Jeito 2 — Gratuito Para Sempre (Neon.tech ou Supabase + Render Web Service):
+1. Crie uma conta gratuita no site **[Neon.tech](https://neon.tech)** (ou **[Supabase.com](https://supabase.com)**), crie um banco PostgreSQL e copie o link dele (começa com `postgresql://...`).
+2. No painel do **Render**, clique em **New +** → **Web Service** *(importante: escolha **Web Service**, não Static Site!)*.
+3. Conecte o repositório **`bv-tasks`** e confira os comandos:
+   - **Build Command:** `npm install && npm run build`
+   - **Start Command:** `npm start`
+4. Na aba **Environment**, adicione a variável:
+   - Nome (`Key`): `DATABASE_URL`
+   - Valor (`Value`): cole o link `postgresql://...` que você copiou.
+5. Salve! Assim que terminar de publicar, aparecerá **🟢 Banco SQL PostgreSQL Conectado** na tela de login, e sua conta funcionará em qualquer computador, iPhone ou Android!

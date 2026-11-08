@@ -1,3 +1,9 @@
+databases:
+  - name: bv-tasks-sql
+    databaseName: bv_tasks
+    user: bv_tasks_user
+    plan: free
+
 services:
   - type: web
     name: bv-tasks
@@ -5,18 +11,13 @@ services:
     plan: free
     buildCommand: npm install && npm run build
     startCommand: npm start
+    healthCheckPath: /api/health
     envVars:
       - key: NODE_ENV
         value: production
-      - key: PORT
-        value: 10000
-    headers:
-      - path: /*
-        name: X-Frame-Options
-        value: DENY
-      - path: /*
-        name: Referrer-Policy
-        value: strict-origin-when-cross-origin
-      - path: /*
-        name: Permissions-Policy
-        value: camera=(self), microphone=(), geolocation=()
+      - key: AUTH_SECRET
+        generateValue: true
+      - key: DATABASE_URL
+        fromDatabase:
+          name: bv-tasks-sql
+          property: connectionString

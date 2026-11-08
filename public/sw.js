@@ -1,11 +1,12 @@
 /**
- * Service Worker do B V Tasks PWA (v7)
+ * Service Worker do B V Tasks PWA (v8)
+ * - Bypass estrito para rotas de API (/api/*) garantindo leitura sempre em tempo real do SQL
  * - Network-First para navegação HTML (evita tela em branco após novo deploy no Render)
- * - Stale-While-Revalidate seguro para assets (valida Content-Type para nunca salvar HTML como JS/CSS)
+ * - Stale-While-Revalidate seguro para assets estáticos
  * - Limpeza automática de caches antigos
  */
 
-const CACHE_VERSION = 'bv-tasks-v7';
+const CACHE_VERSION = 'bv-tasks-v8';
 const STATIC_CACHE = `${CACHE_VERSION}-static`;
 const RUNTIME_CACHE = `${CACHE_VERSION}-runtime`;
 
@@ -49,6 +50,12 @@ self.addEventListener('fetch', (event) => {
   const { request } = event;
 
   if (request.method !== 'GET' || !request.url.startsWith(self.location.origin)) {
+    return;
+  }
+
+  const parsedUrl = new URL(request.url);
+  // NUNCA faz cache das rotas de Banco de Dados / API (/api/*)
+  if (parsedUrl.pathname.startsWith('/api/')) {
     return;
   }
 
