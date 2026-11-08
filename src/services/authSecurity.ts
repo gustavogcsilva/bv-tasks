@@ -1,5 +1,5 @@
 /**
- * Serviço de Segurança e Autenticação B V Tasks
+ * Serviço de Segurança e Autenticação BVS Special
  * Atuação de Engenheiro de Segurança Sênior:
  * - Validação rigorosa de tokens JWT do Google (Google Identity Services / OAuth 2.0)
  * - Verificação de emissores válidos ('accounts.google.com' ou 'https://accounts.google.com')

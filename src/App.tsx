@@ -190,19 +190,19 @@ export function BVTasksApp() {
   const currentYear = new Date().getFullYear();
 
   function handleExportAllPdf() {
-    exportTasksToPdf(tasks, `bvs-special-completo-${selectedDateKey}.pdf`, {
-      title: 'Relatorio Completo de Tarefas - B.V.S Special',
-      userName: currentUser?.name,
+    exportTasksToPdf(tasks, `bvs-special-todas-tarefas-${selectedDateKey}.pdf`, {
+      title: 'Relatorio Executivo Completo de Tarefas',
+      userName: currentUser?.name || 'Gustavo Geraldo',
     });
-    showToast('📄 Arquivo PDF gerado e exportado com sucesso!', 'success');
+    showToast('📄 Arquivo PDF com todas as tarefas gerado e exportado com sucesso!', 'success');
   }
 
   function handleExportDayPdf() {
     exportTasksToPdf(visibleTasks, `bvs-special-agenda-${selectedDateKey}.pdf`, {
-      title: `Agenda do Dia (${selectedDateKey}) - B.V.S Special`,
-      userName: currentUser?.name,
+      title: `Agenda Executiva do Dia (${selectedDateKey})`,
+      userName: currentUser?.name || 'Gustavo Geraldo',
     });
-    showToast('📄 Arquivo PDF do dia exportado com sucesso!', 'success');
+    showToast('📄 Arquivo PDF da agenda do dia exportado com sucesso!', 'success');
   }
 
   async function handleEnableNotifications() {
@@ -361,7 +361,7 @@ export function BVTasksApp() {
       )}
 
       <div className="safe-area-container mx-auto flex min-h-dvh w-full max-w-6xl flex-col">
-      {/* Cabeçalho Principal B.V.S Special (Vermelho Vinho e Preto + Tipografia HIG + Claro/Escuro) */}
+      {/* Cabeçalho Principal BVS Special (Vermelho Vinho e Preto + Tipografia HIG + Claro/Escuro) */}
         <header className="mb-5 sm:mb-6 flex flex-wrap items-center justify-between gap-2.5 sm:gap-3 pt-1">
           <div className="flex flex-wrap items-center gap-2 sm:gap-2.5">
             <Logo size="md" showText />
@@ -385,9 +385,9 @@ export function BVTasksApp() {
                   {currentUser.name.charAt(0).toUpperCase()}
                 </span>
               )}
-              <span className="max-w-[90px] truncate sm:max-w-[140px]">{currentUser.name}</span>
+              <span className="font-heading max-w-[90px] truncate sm:max-w-[140px]">{currentUser.name}</span>
               {highPriorityCount > 0 && (
-                <span className="rounded-full bg-[#DC2626] px-1.5 py-0.5 text-[9px] font-black text-white">
+                <span className="font-heading rounded-full bg-[#DC2626] px-1.5 py-0.5 text-[9px] font-black text-white">
                   ⭐ {highPriorityCount}
                 </span>
               )}
@@ -395,6 +395,18 @@ export function BVTasksApp() {
           </div>
 
           <div className="flex w-full sm:w-auto flex-wrap items-center justify-between sm:justify-end gap-2">
+            {/* Botão Executivo de Destaque: Exportar Todas as Tarefas em PDF */}
+            <button
+              type="button"
+              onClick={handleExportAllPdf}
+              title="Gerar e exportar documento PDF executivo de todas as tarefas"
+              className="flex h-[40px] cursor-pointer items-center gap-1.5 rounded-xl border border-[#991B1B]/40 bg-white px-2.5 sm:px-3 text-[12px] font-bold text-[#991B1B] shadow-xs transition-all hover:border-[#991B1B] hover:bg-[#FEF2F2] hover:shadow-md active:scale-95 dark:border-[#7F1D1D] dark:bg-[#1C1C22] dark:text-[#FCA5A5] dark:hover:bg-[#271518]"
+            >
+              <span className="text-[14px]">📄</span>
+              <span className="font-heading hidden sm:inline">Exportar Todas (PDF)</span>
+              <span className="font-heading sm:hidden">Todas em PDF</span>
+            </button>
+
             {/* Indicador Interativo de Sincronização Mobile & Desktop (Online / Offline) */}
             <button
               type="button"
@@ -407,7 +419,7 @@ export function BVTasksApp() {
               }`}
             >
               <span className={`h-2 w-2 rounded-full ${isOnline ? 'bg-[#16A34A]' : 'bg-[#EA580C]'}`} />
-              <span>{isOnline ? 'Sincronizado' : 'Modo Offline'}</span>
+              <span className="font-heading">{isOnline ? 'Sincronizado' : 'Modo Offline'}</span>
             </button>
 
             {/* Botão Claro / Escuro */}
@@ -417,7 +429,7 @@ export function BVTasksApp() {
               aria-label="Alternar tema claro ou escuro"
               className="flex h-[40px] cursor-pointer items-center gap-1.5 rounded-xl border border-[#E5E4E0] bg-white px-2.5 sm:px-3 text-[12px] font-bold text-[#0F0F12] transition-colors hover:bg-[#F1EFEA] active:scale-95 dark:border-[#27272A] dark:bg-[#141418] dark:text-[#FAFAFA]"
             >
-              <span>{theme === 'dark' ? '☀️ Claro' : '🌙 Escuro'}</span>
+              <span className="font-heading">{theme === 'dark' ? '☀️ Claro' : '🌙 Escuro'}</span>
             </button>
 
             {/* Botão de Ativar Notificações no Celular */}
@@ -427,7 +439,7 @@ export function BVTasksApp() {
                 onClick={handleEnableNotifications}
                 className="flex h-[40px] cursor-pointer items-center gap-1.5 rounded-xl border border-[#FECACA] bg-[#FEF2F2] px-2.5 sm:px-3 text-[12px] font-bold text-[#991B1B] transition-colors hover:bg-[#FEE2E2] active:scale-95 dark:border-[#7F1D1D] dark:bg-[#271518] dark:text-[#FCA5A5]"
               >
-                🔔 Alertas
+                <span className="font-heading">🔔 Alertas</span>
               </button>
             )}
 
@@ -435,7 +447,7 @@ export function BVTasksApp() {
               type="button"
               aria-label="Adicionar tarefa"
               onClick={() => setIsModalVisible(true)}
-              className="ml-auto sm:ml-0 flex h-[44px] cursor-pointer items-center justify-center gap-1.5 rounded-[14px] bg-gradient-to-r from-[#0F0F12] via-[#450A0A] to-[#991B1B] px-4 text-[14px] font-bold text-white shadow-md shadow-[#7F1D1D]/25 transition-all hover:opacity-95 active:scale-95"
+              className="font-heading ml-auto sm:ml-0 flex h-[44px] cursor-pointer items-center justify-center gap-1.5 rounded-[14px] bg-gradient-to-r from-[#0F0F12] via-[#450A0A] to-[#991B1B] px-4 text-[14px] font-bold text-white shadow-md shadow-[#7F1D1D]/25 transition-all hover:opacity-95 active:scale-95"
             >
               <span className="text-[20px] leading-none font-normal">＋</span>
               <span>Nova tarefa</span>
@@ -478,25 +490,33 @@ export function BVTasksApp() {
             aria-label="Agenda e Lista de tarefas"
             className="flex flex-col rounded-3xl border border-[#E5E4E0] bg-white p-5 shadow-[0_4px_20px_rgba(15,15,18,0.04)] sm:p-6 dark:border-[#27272A] dark:bg-[#141418]"
           >
-            <div className="mb-4 flex flex-wrap items-end justify-between gap-2">
+            <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
               <div>
-                <h2 className="text-[22px] font-extrabold tracking-tight text-[#0F0F12] dark:text-[#FAFAFA]">
+                <h2 className="font-editorial text-[24px] sm:text-[28px] font-black tracking-tight text-[#0F0F12] dark:text-[#FAFAFA]">
                   Agenda
                 </h2>
-                <p className="mt-0.5 text-[13px] font-medium text-[#71717A] capitalize dark:text-[#A1A1AA]">
+                <p className="font-heading mt-0.5 text-[13px] font-semibold text-[#71717A] capitalize dark:text-[#A1A1AA]">
                   {dateLabel.charAt(0).toUpperCase() + dateLabel.slice(1)}
                 </p>
               </div>
 
               <div className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  onClick={handleExportAllPdf}
+                  title="Exportar todas as tarefas cadastradas em arquivo PDF executivo"
+                  className="font-heading cursor-pointer rounded-xl border border-[#991B1B]/40 bg-white px-3 py-1.5 text-[11px] font-bold text-[#991B1B] shadow-xs transition-colors hover:bg-[#FEF2F2] hover:border-[#991B1B] active:scale-95 dark:border-[#7F1D1D] dark:bg-[#1C1C22] dark:text-[#FCA5A5]"
+                >
+                  📄 Todas em PDF
+                </button>
                 {visibleTasks.length > 0 && (
                   <>
                     <button
                       type="button"
                       onClick={handleExportDayPdf}
-                      className="cursor-pointer rounded-xl border border-[#FECACA] bg-[#FEF2F2] px-3 py-1.5 text-[11px] font-bold text-[#991B1B] transition-colors hover:bg-[#FEE2E2] active:scale-95 dark:border-[#7F1D1D] dark:bg-[#271518] dark:text-[#FCA5A5]"
+                      className="font-heading cursor-pointer rounded-xl border border-[#FECACA] bg-[#FEF2F2] px-3 py-1.5 text-[11px] font-bold text-[#991B1B] transition-colors hover:bg-[#FEE2E2] active:scale-95 dark:border-[#7F1D1D] dark:bg-[#271518] dark:text-[#FCA5A5]"
                     >
-                      📄 Exportar Dia como PDF (.pdf)
+                      📄 Exportar Dia (PDF)
                     </button>
                     <button
                       type="button"
@@ -506,13 +526,13 @@ export function BVTasksApp() {
                           `bvs-special-${selectedDateKey}.ics`,
                         )
                       }
-                      className="cursor-pointer rounded-xl border border-[#E5E4E0] bg-[#F8F7F4] px-3 py-1.5 text-[11px] font-bold text-[#0F0F12] transition-colors hover:bg-[#ECE9E2] active:scale-95 dark:border-[#2E2E34] dark:bg-[#1C1C22] dark:text-[#FAFAFA]"
+                      className="font-heading cursor-pointer rounded-xl border border-[#E5E4E0] bg-[#F8F7F4] px-3 py-1.5 text-[11px] font-bold text-[#0F0F12] transition-colors hover:bg-[#ECE9E2] active:scale-95 dark:border-[#2E2E34] dark:bg-[#1C1C22] dark:text-[#FAFAFA]"
                     >
-                      📲 Sincronizar Dia no Celular (.ics)
+                      📲 Sincronizar (.ics)
                     </button>
                   </>
                 )}
-                <span className="rounded-xl bg-[#F1EFEA] px-3 py-1.5 text-[12px] font-bold text-[#27272A] dark:bg-[#27272A] dark:text-[#E4E4E7]">
+                <span className="font-heading rounded-xl bg-[#F1EFEA] px-3 py-1.5 text-[12px] font-bold text-[#27272A] dark:bg-[#27272A] dark:text-[#E4E4E7]">
                   {pendingCount} pendente{pendingCount === 1 ? '' : 's'}
                 </span>
               </div>
@@ -754,9 +774,9 @@ export function BVTasksApp() {
         )}
 
         {/* Rodapé Executivo com Ano Dinâmico Automático (2026 -> 2027 -> ...) */}
-        <footer className="mt-8 border-t border-[#E5E4E0] py-4 text-center text-[12px] font-semibold text-[#71717A] dark:border-[#27272A] dark:text-[#A1A1AA]">
-          <p>
-            <span className="font-extrabold text-[#991B1B] dark:text-[#F87171]">B.V.S Special</span>{' '}
+        <footer className="mt-8 border-t border-[#E5E4E0] py-5 text-center text-[12px] font-semibold text-[#71717A] dark:border-[#27272A] dark:text-[#A1A1AA]">
+          <p className="font-heading">
+            <span className="font-display font-black text-[#991B1B] dark:text-[#F87171]">BVS Special</span>{' '}
             — Created By{' '}
             <span className="font-bold text-[#0F0F12] dark:text-[#FAFAFA]">Gustavo Geraldo</span> ©{' '}
             <span>{currentYear}</span>

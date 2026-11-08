@@ -84,7 +84,7 @@ describe('useTaskStore — Autenticação (Google, E-mail, Recuperação), Tema 
 
     const ics = generateIcsContent([task]);
     expect(ics).toContain('BEGIN:VCALENDAR');
-    expect(ics).toContain('SUMMARY:[B.V.S Special • Trabalho] Reunião Executiva B V');
+    expect(ics).toContain('SUMMARY:[BVS Special • Trabalho] Reunião Executiva B V');
     expect(ics).toContain('BEGIN:VALARM');
 
     const gcalUrl = getGoogleCalendarUrl(task);
@@ -93,7 +93,7 @@ describe('useTaskStore — Autenticação (Google, E-mail, Recuperação), Tema 
     const pdfBytes = generateTasksPdfBytes([task], { userName: 'Gustavo Geraldo' });
     const pdfText = new TextDecoder().decode(pdfBytes);
     expect(pdfText.startsWith('%PDF-1.4')).toBe(true);
-    expect(pdfText).toContain('B.V.S SPECIAL');
+    expect(pdfText).toContain('BVS SPECIAL');
     expect(pdfText).toContain('Gustavo Geraldo');
     expect(pdfText).toContain(String(new Date().getFullYear()));
   });

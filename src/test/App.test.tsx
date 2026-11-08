@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import App from '../App';
 import { useTaskStore } from '../stores/useTaskStore';
 
-describe('Integração da Interface B.V.S Special PWA (Vinho & Preto, Claro/Escuro, Google Auth e Calendário)', () => {
+describe('Integração da Interface BVS Special PWA (Vinho & Preto, Claro/Escuro, Google Auth e Calendário)', () => {
   beforeEach(() => {
     window.localStorage.clear();
     useTaskStore.setState({
@@ -25,10 +25,10 @@ describe('Integração da Interface B.V.S Special PWA (Vinho & Preto, Claro/Escu
     });
   });
 
-  it('deve exibir a tela de autenticação com B.V.S Special, opção Google, Criar Conta e Esqueci a Senha, e entrar no app', async () => {
+  it('deve exibir a tela de autenticação com BVS Special, opção Google, Criar Conta e Esqueci a Senha, e entrar no app', async () => {
     render(<App />);
 
-    expect(screen.getByText('B.V.S Special')).toBeInTheDocument();
+    expect(screen.getByText('BVS Special')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Continuar com o Google/i })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Esqueci a senha' })).toBeInTheDocument();
 
@@ -131,8 +131,8 @@ describe('Integração da Interface B.V.S Special PWA (Vinho & Preto, Claro/Escu
 
     render(<App />);
 
-    expect(screen.getAllByText('B.V.S Special').length).toBeGreaterThanOrEqual(1);
-    expect(screen.getByText('B • V • S')).toBeInTheDocument();
+    expect(screen.getAllByText('BVS Special').length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText('BVS SPECIAL').length).toBeGreaterThanOrEqual(1);
     expect(screen.getByText(/Gustavo Geraldo/i)).toBeInTheDocument();
     expect(screen.getByText(new RegExp(String(new Date().getFullYear())))).toBeInTheDocument();
 

@@ -6,17 +6,17 @@
       name="viewport"
       content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover"
     />
-    <title>B.V.S Special</title>
+    <title>BVS Special</title>
     <meta
       name="description"
-      content="B.V.S Special — Planejamento Executivo com Calendário, Pastas, Câmera/PDFs, Notificações e Sincronização Mobile."
+      content="BVS Special — Planejamento Executivo com Calendário, Pastas, Câmera/PDFs, Notificações e Sincronização Mobile."
     />
 
-    <!-- Tipografia Executiva Padrão Apple HIG & Inter com fallback nativo de sistema -->
+    <!-- Tipografia Executiva de Alto Padrão: Cinzel & Playfair Display (Títulos & Marca) + Plus Jakarta Sans (Subtítulos & Seções) + Inter (Corpo & Dados) -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
-      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"
+      href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700;800;900&family=Playfair+Display:ital,wght@0,600;0,700;0,800;0,900;1,600&family=Plus+Jakarta+Sans:wght@500;600;700;800&family=Inter:wght@400;500;600;700;800&display=swap"
       rel="stylesheet"
     />
 
@@ -32,7 +32,7 @@
     <!-- iOS Web App Meta Tags (iPhone Safari Standalone) -->
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-    <meta name="apple-mobile-web-app-title" content="B.V.S Special" />
+    <meta name="apple-mobile-web-app-title" content="BVS Special" />
     <meta name="format-detection" content="telephone=no" />
 
     <!-- Ícones para iOS, Android e Navegadores -->
@@ -42,7 +42,7 @@
     <!-- Script de Autocura e Proteção contra Tela Branca / Cache Legado -->
     <script>
       (function() {
-        var APP_VERSION = 'bv-tasks-v10';
+        var APP_VERSION = 'bv-tasks-v11';
         try {
           var storedVersion = localStorage.getItem('__bv_tasks_cache_version__');
           if (storedVersion !== APP_VERSION) {
@@ -64,7 +64,7 @@
           setTimeout(function() {
             var rootEl = document.getElementById('root');
             if (rootEl && rootEl.childElementCount === 0) {
-              console.warn('[B.V.S Special] Detectado root vazio. Limpando Service Workers e recarregando...');
+              console.warn('[BVS Special] Detectado root vazio. Limpando Service Workers e recarregando...');
               if ('serviceWorker' in navigator) {
                 navigator.serviceWorker.getRegistrations().then(function(regs) {
                   regs.forEach(function(r) { r.unregister(); });

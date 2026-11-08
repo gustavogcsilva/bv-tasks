@@ -14,9 +14,8 @@
   body {
     margin: 0;
     padding: 0;
-    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Inter",
-      "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-    letter-spacing: -0.012em;
+    font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    letter-spacing: -0.011em;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     -webkit-tap-highlight-color: transparent;
@@ -30,6 +29,27 @@
     user-select: text;
     -webkit-user-select: text;
   }
+}
+
+/* Tipografia Executiva Diferenciada (Títulos, Subtítulos e Conteúdo) */
+.font-display {
+  font-family: "Cinzel", "Playfair Display", Georgia, serif;
+  letter-spacing: -0.015em;
+}
+
+.font-editorial {
+  font-family: "Playfair Display", Georgia, serif;
+  letter-spacing: -0.02em;
+}
+
+.font-heading {
+  font-family: "Plus Jakarta Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  letter-spacing: -0.025em;
+}
+
+.font-body {
+  font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  letter-spacing: -0.011em;
 }
 
 /* Espaçamento seguro para Notch / Dynamic Island (iPhone) e barras de gestos (Android) */

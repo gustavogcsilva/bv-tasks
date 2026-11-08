@@ -140,7 +140,7 @@ export function TaskItem({
 
         <div>
           <h3
-            className={`line-clamp-2 text-[16px] font-bold leading-snug ${
+            className={`font-heading line-clamp-2 text-[16px] font-bold leading-snug tracking-tight ${
               task.isCompleted
                 ? 'text-[#71717A] line-through dark:text-[#71717A]'
                 : 'text-[#0F0F12] dark:text-[#FAFAFA]'
@@ -149,7 +149,7 @@ export function TaskItem({
             {task.title}
           </h3>
           {task.description ? (
-            <p className="mt-1 line-clamp-2 text-[13px] leading-[18px] text-[#52525B] dark:text-[#A1A1AA]">
+            <p className="font-body mt-1 line-clamp-2 text-[13px] leading-[18px] text-[#52525B] dark:text-[#A1A1AA]">
               {task.description}
             </p>
           ) : null}

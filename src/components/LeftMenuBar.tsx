@@ -71,17 +71,17 @@ export function LeftMenuBar({
 
           <div className="flex flex-col">
             <div className="flex items-center gap-1.5">
-              <span className="text-[14px] font-extrabold tracking-tight text-[#0F0F12] dark:text-[#FAFAFA]">
+              <span className="font-heading text-[14px] font-extrabold tracking-tight text-[#0F0F12] dark:text-[#FAFAFA]">
                 {currentUser.name}
               </span>
               <span
-                className={`rounded-md px-1.5 py-0.5 text-[9px] font-extrabold uppercase ${
+                className={`font-heading rounded-md px-1.5 py-0.5 text-[9px] font-extrabold uppercase ${
                   currentUser.provider === 'google'
                     ? 'bg-[#EBF5FF] text-[#2563EB] dark:bg-[#1E293B] dark:text-[#60A5FA]'
                     : 'bg-[#FEF2F2] text-[#991B1B] dark:bg-[#271518] dark:text-[#FCA5A5]'
                 }`}
               >
-                {currentUser.provider === 'google' ? 'Google' : 'B.V.S Special'}
+                {currentUser.provider === 'google' ? 'Google' : 'BVS Special'}
               </span>
             </div>
             <span className="max-w-[190px] truncate text-[11px] font-medium text-[#71717A] dark:text-[#A1A1AA]">
@@ -261,23 +261,24 @@ export function LeftMenuBar({
 
       {/* Ações rápidas de exportação para Calendário (.ics) e Arquivo PDF (.pdf) */}
       {(onSyncCalendar || onExportPdf) && (
-        <div className="flex flex-col gap-2">
+        <div className="flex flex-col gap-2 pt-1 border-t border-[#F1EFEA] dark:border-[#27272A]">
           {onExportPdf && (
             <button
               type="button"
               onClick={onExportPdf}
-              className="flex min-h-[38px] w-full cursor-pointer items-center justify-center gap-2 rounded-xl border border-[#FECACA] bg-[#FEF2F2] px-3 text-[11px] font-bold text-[#991B1B] transition-colors hover:bg-[#FEE2E2] active:scale-95 dark:border-[#7F1D1D] dark:bg-[#271518] dark:text-[#FCA5A5]"
+              className="font-heading flex min-h-[42px] w-full cursor-pointer items-center justify-center gap-2 rounded-xl border border-[#991B1B]/40 bg-[#FEF2F2] px-3.5 text-[12px] font-bold text-[#991B1B] shadow-xs transition-all hover:bg-[#FEE2E2] hover:border-[#991B1B] active:scale-95 dark:border-[#7F1D1D] dark:bg-[#271518] dark:text-[#FCA5A5]"
             >
-              <span>📄 Gerar e Exportar Tarefas como PDF (.pdf)</span>
+              <span className="text-[14px]">📄</span>
+              <span>Exportar Relatório em PDF ({tasks.length})</span>
             </button>
           )}
           {onSyncCalendar && (
             <button
               type="button"
               onClick={onSyncCalendar}
-              className="flex min-h-[38px] w-full cursor-pointer items-center justify-center gap-2 rounded-xl border border-[#E5E4E0] bg-[#F8F7F4] px-3 text-[11px] font-bold text-[#0F0F12] transition-colors hover:bg-[#ECE9E2] active:scale-95 dark:border-[#27272A] dark:bg-[#1C1C22] dark:text-[#FAFAFA]"
+              className="font-heading flex min-h-[38px] w-full cursor-pointer items-center justify-center gap-2 rounded-xl border border-[#E5E4E0] bg-[#F8F7F4] px-3 text-[11px] font-bold text-[#0F0F12] transition-colors hover:bg-[#ECE9E2] active:scale-95 dark:border-[#27272A] dark:bg-[#1C1C22] dark:text-[#FAFAFA]"
             >
-              <span>📲 Sincronizar com Calendário do Celular (.ics)</span>
+              <span>📲 Sincronizar com Calendário (.ics)</span>
             </button>
           )}
         </div>

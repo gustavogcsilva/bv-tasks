@@ -297,13 +297,13 @@ export function AuthScreen() {
           </button>
         </div>
 
-        {/* Logo B.V.S Special (Garrafa + Taça de Vinho + Livro + B V) com Tipografia de Sistema HIG */}
+        {/* Logo BVS Special (Garrafa + Taça de Vinho + Livro) com Tipografia Executiva */}
         <div className="mb-6 flex flex-col items-center text-center">
           <Logo size="lg" showText={false} />
-          <h1 className="mt-4 text-[26px] font-extrabold tracking-tight text-[#0F0F12] dark:text-[#FAFAFA]">
-            B.V.S Special
+          <h1 className="font-display mt-4 text-[28px] sm:text-[30px] font-black tracking-tight text-[#0F0F12] dark:text-[#FAFAFA]">
+            BVS Special
           </h1>
-          <p className="mt-1 text-[13px] font-medium text-[#52525B] dark:text-[#A1A1AA]">
+          <p className="font-heading mt-1 text-[13px] font-medium text-[#52525B] dark:text-[#A1A1AA]">
             Planejamento executivo para{' '}
             <span className="font-bold text-[#991B1B] dark:text-[#F87171]">Trabalho</span>,{' '}
             <span className="font-bold text-[#2563EB] dark:text-[#60A5FA]">Pessoal</span> e{' '}
@@ -647,13 +647,13 @@ export function AuthScreen() {
             </div>
           )}
 
-          <Button type="submit" className="w-full">
+          <Button type="submit" className="font-heading w-full">
             {mode === 'google-direct'
               ? 'Autenticar com o Google'
               : mode === 'register'
                 ? 'Criar conta e acessar'
                 : mode === 'login'
-                  ? 'Entrar no B.V.S Special'
+                  ? 'Entrar no BVS Special'
                   : recoveryMethod === 'keyword' || isEmailResetStep2
                     ? 'Redefinir senha e entrar'
                     : 'Enviar link para o e-mail'}
@@ -662,8 +662,8 @@ export function AuthScreen() {
 
         {/* Rodapé Executivo com Ano Dinâmico Automático (2026 -> 2027 -> ...) */}
         <footer className="mt-6 border-t border-[#E5E4E0] pt-4 text-center text-[11px] font-semibold text-[#71717A] dark:border-[#27272A] dark:text-[#A1A1AA]">
-          <p>
-            <span className="font-extrabold text-[#991B1B] dark:text-[#F87171]">B.V.S Special</span>{' '}
+          <p className="font-heading">
+            <span className="font-display font-black text-[#991B1B] dark:text-[#F87171]">BVS Special</span>{' '}
             — Created By{' '}
             <span className="font-bold text-[#0F0F12] dark:text-[#FAFAFA]">Gustavo Geraldo</span> ©{' '}
             <span>{new Date().getFullYear()}</span>

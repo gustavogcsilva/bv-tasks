@@ -275,12 +275,12 @@ export function TaskModal({
           <div>
             <h2
               id="task-modal-title"
-              className="text-[20px] font-bold tracking-tight text-[#0F0F12] dark:text-[#FAFAFA]"
+              className="font-editorial text-[22px] sm:text-[24px] font-bold tracking-tight text-[#0F0F12] dark:text-[#FAFAFA]"
             >
               Nova tarefa
             </h2>
-            <p className="mt-0.5 text-[13px] text-[#71717A] dark:text-[#A1A1AA]">
-              Planeje seu dia em Trabalho, Pessoal ou Estudo
+            <p className="font-heading mt-0.5 text-[13px] font-medium text-[#71717A] dark:text-[#A1A1AA]">
+              Planeje seu foco em Trabalho, Pessoal ou Estudo no BVS Special
             </p>
           </div>
           <button

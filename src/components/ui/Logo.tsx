@@ -11,7 +11,7 @@ export function Logo({ size = 'md', showText = true }: LogoProps) {
   }[size];
 
   return (
-    <div className="inline-flex items-center gap-3.5 select-none">
+    <div className="inline-flex items-center gap-3 select-none">
       <div
         className={`${dimensions} relative flex shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-[#991B1B]/40 bg-gradient-to-br from-[#09090B] via-[#450A0A] to-[#881337] shadow-lg shadow-[#7F1D1D]/25`}
       >
@@ -20,36 +20,36 @@ export function Logo({ size = 'md', showText = true }: LogoProps) {
           className="h-full w-full p-1"
           fill="none"
           xmlns="http://www.w3.org/2000/svg"
-          aria-label="Logo B.V.S Special — Garrafa de Vinho, Taça de Vinho, Livro e Iniciais B V S"
+          aria-label="Logo BVS Special — Garrafa de Vinho, Taça de Vinho, Livro Aberto"
         >
           {/* Moldura circular executiva sutil */}
           <circle
             cx="70"
-            cy="64"
+            cy="66"
             r="56"
             stroke="#FDE68A"
-            strokeOpacity="0.22"
+            strokeOpacity="0.25"
             strokeWidth="1.5"
           />
 
-          {/* Garrafa de Vinho (Lado Esquerdo Central) */}
+          {/* Garrafa de Vinho (Central Esquerda) */}
           {/* Gargalo e cápsula */}
-          <rect x="48" y="15" width="8" height="14" rx="2" fill="#09090B" stroke="#FDE68A" strokeWidth="2" />
-          <line x1="47" y1="19" x2="57" y2="19" stroke="#DC2626" strokeWidth="2.5" strokeLinecap="round" />
+          <rect x="49" y="16" width="9" height="15" rx="2" fill="#09090B" stroke="#FDE68A" strokeWidth="2" />
+          <line x1="48" y1="20" x2="59" y2="20" stroke="#DC2626" strokeWidth="2.5" strokeLinecap="round" />
           {/* Corpo da Garrafa */}
           <path
-            d="M48 29C44 33 42 38 42 44V74C42 76.2 43.8 78 46 78H58C60.2 78 62 76.2 62 74V44C62 38 60 33 56 29H48Z"
+            d="M49 31C44 35 42 40 42 46V76C42 78.2 43.8 80 46 80H59C61.2 80 63 78.2 63 76V46C63 40 61 35 56 31H49Z"
             fill="#18181B"
             stroke="#FDE68A"
             strokeWidth="2.4"
             strokeLinejoin="round"
           />
           {/* Rótulo Bordeaux na Garrafa */}
-          <rect x="45.5" y="46" width="13" height="18" rx="1.5" fill="#991B1B" stroke="#FDE68A" strokeWidth="1.2" />
+          <rect x="46" y="48" width="13.5" height="18" rx="1.5" fill="#991B1B" stroke="#FDE68A" strokeWidth="1.2" />
 
-          {/* Taça de Vinho (Lado Direito Central) */}
+          {/* Taça de Vinho (Central Direita) */}
           <path
-            d="M72 34H94L91.5 49C90.2 56 86.5 60 83 60C79.5 60 75.8 56 74.5 49L72 34Z"
+            d="M74 36H96L93.5 51C92.2 58 88.5 62 85 62C81.5 62 77.8 58 76.5 51L74 36Z"
             stroke="#FDE68A"
             strokeWidth="2.6"
             strokeLinecap="round"
@@ -57,71 +57,50 @@ export function Logo({ size = 'md', showText = true }: LogoProps) {
           />
           {/* Vinho Vermelho Rubi na Taça */}
           <path
-            d="M74.5 43H91.5L90.5 48C89.5 53.5 86.5 57 83 57C79.5 57 76.5 53.5 75.5 48L74.5 43Z"
+            d="M76.5 45H93.5L92.5 50C91.5 55.5 88.5 59 85 59C81.5 59 78.5 55.5 77.5 50L76.5 45Z"
             fill="#DC2626"
           />
           {/* Haste e base da Taça */}
-          <path d="M83 60V76" stroke="#FDE68A" strokeWidth="2.6" strokeLinecap="round" />
-          <path d="M75 76H91" stroke="#FDE68A" strokeWidth="2.6" strokeLinecap="round" />
+          <path d="M85 62V78" stroke="#FDE68A" strokeWidth="2.6" strokeLinecap="round" />
+          <path d="M77 78H93" stroke="#FDE68A" strokeWidth="2.6" strokeLinecap="round" />
 
           {/* Livro Aberto na Base */}
           <path
-            d="M24 85C39 81 55 83 70 90C85 83 101 81 116 85V110C101 106 85 108 70 115C55 108 39 106 24 110V85Z"
+            d="M24 87C39 83 55 85 70 92C85 85 101 83 116 87V111C101 107 85 109 70 116C55 109 39 107 24 111V87Z"
             fill="#FAFAFA"
             stroke="#FDE68A"
             strokeWidth="2.8"
             strokeLinejoin="round"
           />
           {/* Páginas internas e lombada vermelho vinho */}
-          <path d="M70 90V115" stroke="#991B1B" strokeWidth="3" strokeLinecap="round" />
-          <path d="M33 93C44 91 56 92 65 96" stroke="#991B1B" strokeWidth="1.6" strokeLinecap="round" strokeOpacity="0.6" />
-          <path d="M107 93C96 91 84 92 75 96" stroke="#991B1B" strokeWidth="1.6" strokeLinecap="round" strokeOpacity="0.6" />
+          <path d="M70 92V116" stroke="#991B1B" strokeWidth="3" strokeLinecap="round" />
+          <path d="M33 95C44 93 56 94 65 98" stroke="#991B1B" strokeWidth="1.6" strokeLinecap="round" strokeOpacity="0.6" />
+          <path d="M107 95C96 93 84 94 75 98" stroke="#991B1B" strokeWidth="1.6" strokeLinecap="round" strokeOpacity="0.6" />
 
-          {/* Iniciais Profissionais B V S (Simétricas e em Destaque) */}
-          <text
-            x="16"
-            y="64"
-            fill="#FFFFFF"
-            fontFamily="system-ui, -apple-system, BlinkMacSystemFont, 'SF Pro Display', sans-serif"
-            fontWeight="800"
-            fontSize="21"
-            letterSpacing="-0.5"
-          >
-            B
-          </text>
-          <text
-            x="101"
-            y="64"
-            fill="#FFFFFF"
-            fontFamily="system-ui, -apple-system, BlinkMacSystemFont, 'SF Pro Display', sans-serif"
-            fontWeight="800"
-            fontSize="21"
-            letterSpacing="-0.5"
-          >
-            V
-          </text>
+          {/* Identificação Oficial: Somente BVS Special (sem BV nas laterais) */}
+          <rect x="22" y="121" width="96" height="15" rx="4" fill="#09090B" stroke="#FDE68A" strokeWidth="1" strokeOpacity="0.7" />
           <text
             x="70"
-            y="131"
+            y="132"
             textAnchor="middle"
             fill="#FDE68A"
-            fontFamily="system-ui, -apple-system, BlinkMacSystemFont, 'SF Pro Display', sans-serif"
-            fontWeight="900"
-            fontSize="16"
-            letterSpacing="1"
+            fontFamily="'Cinzel', Georgia, serif"
+            fontWeight="800"
+            fontSize="10"
+            letterSpacing="1.2"
           >
-            B • V • S
+            BVS SPECIAL
           </text>
         </svg>
       </div>
 
       {showText && (
         <div className="flex flex-col">
-          <span className="text-[10px] font-extrabold tracking-[2px] text-[#991B1B] uppercase dark:text-[#F87171]">
+          <span className="font-heading text-[10px] font-extrabold tracking-[2px] text-[#991B1B] uppercase dark:text-[#F87171]">
             EXECUTIVE PLANNER
           </span>
-          <span className="text-[20px] sm:text-[22px] leading-tight font-extrabold tracking-tight text-[#0F0F12] dark:text-[#FAFAFA]">
-            B.V.S Special
+          <span className="font-display text-[20px] sm:text-[23px] leading-tight font-black tracking-tight text-[#0F0F12] dark:text-[#FAFAFA]">
+            BVS Special
           </span>
         </div>
       )}
