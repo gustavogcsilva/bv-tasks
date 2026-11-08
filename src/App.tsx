@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { format, isSameDay, parseISO } from 'date-fns';
+import { format, isSameDay, isValid, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { Button } from './components/ui/Button';
 import { Logo } from './components/ui/Logo';
@@ -33,7 +33,11 @@ export function BVTasksApp() {
   const selectedDateKey = useTaskStore((state) => state.selectedDate);
   const scopeFilter = useTaskStore((state) => state.scopeFilter);
   const selectedFolderId = useTaskStore((state) => state.selectedFolderId);
-  const selectedDate = parseISO(selectedDateKey);
+
+  const selectedDate = useMemo(() => {
+    const parsed = parseISO(selectedDateKey);
+    return isValid(parsed) ? parsed : new Date();
+  }, [selectedDateKey]);
 
   const addTask = useTaskStore((state) => state.addTask);
   const toggleTask = useTaskStore((state) => state.toggleTask);
@@ -86,7 +90,10 @@ export function BVTasksApp() {
     () =>
       sortTasks(
         tasks
-          .filter((task) => isSameDay(parseISO(task.date), selectedDate))
+          .filter((task) => {
+            const parsedTaskDate = parseISO(task.date);
+            return isValid(parsedTaskDate) && isSameDay(parsedTaskDate, selectedDate);
+          })
           .filter((task) => scopeFilter === 'all' || task.scope === scopeFilter)
           .filter(
             (task) => selectedFolderId === 'all' || task.folderId === selectedFolderId,

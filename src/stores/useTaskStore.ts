@@ -1,4 +1,4 @@
-import { format } from 'date-fns';
+import { format, isValid, parseISO } from 'date-fns';
 import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
 import type {
@@ -21,20 +21,42 @@ const priorityRank: Record<Priority, number> = {
   low: 2,
 };
 
+const DEFAULT_FOLDERS: TaskFolder[] = [
+  {
+    id: 'folder-work-default',
+    name: 'Projetos & Clientes',
+    scope: 'work',
+    createdAt: '2026-01-01T00:00:00.000Z',
+  },
+  {
+    id: 'folder-study-default',
+    name: 'Leituras & Cursos',
+    scope: 'study',
+    createdAt: '2026-01-01T00:00:01.000Z',
+  },
+  {
+    id: 'folder-personal-default',
+    name: 'Rotina Pessoal',
+    scope: 'personal',
+    createdAt: '2026-01-01T00:00:02.000Z',
+  },
+];
+
 /**
- * Ordena as tarefas automaticamente:
+ * Ordena as tarefas automaticamente com proteção contra dados legados:
  * 1. Tarefas pendentes primeiro, concluídas por último
  * 2. Prioridade: Alta (high) > Média (medium) > Baixa (low)
  * 3. Horário definido (mais cedo primeiro)
  * 4. Ordem de criação (createdAt)
  */
 export function sortTasks(tasks: Task[]): Task[] {
+  if (!Array.isArray(tasks)) return [];
   return [...tasks].sort(
     (left, right) =>
-      Number(left.isCompleted) - Number(right.isCompleted) ||
-      priorityRank[left.priority] - priorityRank[right.priority] ||
+      Number(Boolean(left.isCompleted)) - Number(Boolean(right.isCompleted)) ||
+      (priorityRank[left.priority] ?? 1) - (priorityRank[right.priority] ?? 1) ||
       (left.time ?? '99:99').localeCompare(right.time ?? '99:99') ||
-      left.createdAt.localeCompare(right.createdAt),
+      (left.createdAt ?? '').localeCompare(right.createdAt ?? ''),
   );
 }
 
@@ -89,26 +111,7 @@ export const useTaskStore = create<TaskStore>()(
   persist(
     (set, get) => ({
       tasks: [],
-      folders: [
-        {
-          id: 'folder-work-default',
-          name: 'Projetos & Clientes',
-          scope: 'work',
-          createdAt: '2026-01-01T00:00:00.000Z',
-        },
-        {
-          id: 'folder-study-default',
-          name: 'Leituras & Cursos',
-          scope: 'study',
-          createdAt: '2026-01-01T00:00:01.000Z',
-        },
-        {
-          id: 'folder-personal-default',
-          name: 'Rotina Pessoal',
-          scope: 'personal',
-          createdAt: '2026-01-01T00:00:02.000Z',
-        },
-      ],
+      folders: DEFAULT_FOLDERS,
       selectedDate: format(new Date(), 'yyyy-MM-dd'),
       scopeFilter: 'all',
       selectedFolderId: 'all',
@@ -333,7 +336,8 @@ export const useTaskStore = create<TaskStore>()(
         if (!account) {
           return { ok: false, error: 'Nenhuma conta encontrada com este e-mail.' };
         }
-        const origin = typeof window !== 'undefined' ? window.location.origin : 'https://bv-tasks.onrender.com';
+        const origin =
+          typeof window !== 'undefined' ? window.location.origin : 'https://bv-tasks.onrender.com';
         const token = btoa(encodeURIComponent(normalizedEmail));
         const resetLink = `${origin}/?reset_token=${token}&email=${encodeURIComponent(normalizedEmail)}`;
         return { ok: true, resetLink };
@@ -365,7 +369,35 @@ export const useTaskStore = create<TaskStore>()(
     }),
     {
       name: 'bv-tasks-storage',
+      version: 2,
       storage: createJSONStorage(() => safeLocalStorage),
+      merge: (persistedState, currentState) => {
+        const raw = (persistedState as Partial<TaskStore> | undefined) ?? {};
+        const validDate =
+          typeof raw.selectedDate === 'string' && isValid(parseISO(raw.selectedDate))
+            ? raw.selectedDate
+            : currentState.selectedDate;
+
+        return {
+          ...currentState,
+          tasks: Array.isArray(raw.tasks) ? raw.tasks : currentState.tasks,
+          folders: Array.isArray(raw.folders) ? raw.folders : currentState.folders,
+          selectedDate: validDate,
+          scopeFilter:
+            raw.scopeFilter === 'work' ||
+            raw.scopeFilter === 'personal' ||
+            raw.scopeFilter === 'study' ||
+            raw.scopeFilter === 'all'
+              ? raw.scopeFilter
+              : 'all',
+          selectedFolderId:
+            typeof raw.selectedFolderId === 'string' ? raw.selectedFolderId : 'all',
+          theme: raw.theme === 'dark' || raw.theme === 'light' ? raw.theme : 'light',
+          currentUser:
+            raw.currentUser && typeof raw.currentUser.name === 'string' ? raw.currentUser : null,
+          registeredAccounts: Array.isArray(raw.registeredAccounts) ? raw.registeredAccounts : [],
+        };
+      },
       partialize: (state) => ({
         tasks: state.tasks,
         folders: state.folders,
