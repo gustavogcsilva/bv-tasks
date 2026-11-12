@@ -83,12 +83,10 @@ export const MonthlyReviewModal: React.FC<MonthlyReviewModalProps> = ({
       if (hasPendingSync) {
         await onSyncBeforeReview();
       }
-      const response = await apiRequestMonthlyReview(selectedMonth);
+      const response = await apiRequestMonthlyReview(selectedMonth, tasks);
       if (!response.ok || !response.review) {
         setErrorMsg(
-          response.missingApiKey
-            ? 'Configure a variável de ambiente GEMINI_API_KEY no servidor/Render para habilitar o Fechamento com IA.'
-            : response.error || 'Não foi possível gerar o fechamento do mês agora.',
+          response.error || 'Não foi possível gerar o fechamento do mês agora. Tente novamente.',
         );
         return;
       }

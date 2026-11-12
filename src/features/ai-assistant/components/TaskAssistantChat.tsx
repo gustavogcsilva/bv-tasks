@@ -97,9 +97,8 @@ export const TaskAssistantChat: React.FC<TaskAssistantChatProps> = ({
       const response = await apiAskTaskAssistant(trimmed, currentDate, historyPayload);
 
       if (!response.ok) {
-        const errorText = response.missingApiKey
-          ? 'Configure a variável GEMINI_API_KEY no servidor/Render (ou no arquivo .env) para ativar o Assistente IA.'
-          : response.error || 'Não foi possível consultar o Assistente IA agora.';
+        const errorText =
+          response.error || 'Não foi possível consultar o Assistente IA agora. Tente novamente em instantes.';
 
         setMessages((prev) => [
           ...prev,

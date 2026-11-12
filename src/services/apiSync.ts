@@ -534,19 +534,14 @@ export async function apiBulkTasks(tasks: Task[]): Promise<{
 /**
  * Solicita o Fechamento Inteligente do Mês com Google Gemini 2.5 Flash (POST /api/ai/monthly-review)
  */
-export async function apiRequestMonthlyReview(month: string): Promise<MonthlyReviewResponse> {
-  if (!getStoredToken()) {
-    return {
-      ok: false,
-      offline: true,
-      error: 'Conecte-se ao servidor autenticado para gerar análises com a IA Gemini.',
-    };
-  }
-
+export async function apiRequestMonthlyReview(
+  month: string,
+  tasks: Task[] = [],
+): Promise<MonthlyReviewResponse> {
   const res = await safeFetchJson<MonthlyReviewResponse>('/api/ai/monthly-review', {
     method: 'POST',
     headers: getAuthHeaders(),
-    body: JSON.stringify({ month }),
+    body: JSON.stringify({ month, tasks }),
   });
 
   if (res.offline || !res.data) {
@@ -625,14 +620,6 @@ export async function apiAskTaskAssistant(
   currentDate: string,
   history: Array<{ role: 'user' | 'assistant'; text: string }> = [],
 ): Promise<AssistantResponse> {
-  if (!getStoredToken()) {
-    return {
-      ok: false,
-      offline: true,
-      error: 'Conecte-se ao servidor autenticado para usar o Assistente IA.',
-    };
-  }
-
   const res = await safeFetchJson<AssistantResponse>('/api/ai/assistant', {
     method: 'POST',
     headers: getAuthHeaders(),

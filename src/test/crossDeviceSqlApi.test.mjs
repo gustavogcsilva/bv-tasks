@@ -299,7 +299,7 @@ describe('Persistência Multi-Dispositivo Real (Computador ↔ Celular) & Segura
     expect(bulkData.ok).toBe(true);
     expect(bulkData.insertedCount).toBe(3);
 
-    // Sem GEMINI_API_KEY configurada e sem mock deve responder 503 com missingApiKey: true
+    // Sem GEMINI_API_KEY externa configurada e sem mock deve ativar o motor inteligente integrado (200 OK sem bloquear com erro de chave)
     const prevKey = process.env.GEMINI_API_KEY;
     delete process.env.GEMINI_API_KEY;
     try {
@@ -311,9 +311,29 @@ describe('Persistência Multi-Dispositivo Real (Computador ↔ Celular) & Segura
         },
         body: JSON.stringify({ month: '2026-11' }),
       });
-      expect(noKeyRes.status).toBe(503);
+      expect(noKeyRes.status).toBe(200);
       const noKeyJson = await noKeyRes.json();
-      expect(noKeyJson.missingApiKey).toBe(true);
+      expect(noKeyJson.ok).toBe(true);
+      expect(noKeyJson.review.proximosPassos).toHaveLength(3);
+      expect(noKeyJson.review.tarefasSugeridasProximoMes.length).toBeGreaterThan(0);
+
+      const assistantFallbackRes = await fetch(`${baseUrl}/api/ai/assistant`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          message: 'Crie uma tarefa urgente para revisar contrato amanhã às 14:30',
+          currentDate: '2026-11-11',
+        }),
+      });
+      expect(assistantFallbackRes.status).toBe(200);
+      const assistantFallbackJson = await assistantFallbackRes.json();
+      expect(assistantFallbackJson.ok).toBe(true);
+      expect(assistantFallbackJson.suggestedTasks.length).toBeGreaterThan(0);
+      expect(assistantFallbackJson.suggestedTasks[0].priority).toBe('high');
+      expect(assistantFallbackJson.suggestedTasks[0].time).toBe('14:30');
     } finally {
       if (prevKey !== undefined) process.env.GEMINI_API_KEY = prevKey;
     }
