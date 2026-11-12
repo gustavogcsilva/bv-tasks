@@ -12,6 +12,10 @@ interface LeftMenuBarProps {
   onCloseMobileDrawer?: () => void;
   onSyncCalendar?: () => void;
   onExportPdf?: () => void;
+  onOpenImport?: () => void;
+  onOpenAiReview?: () => void;
+  onOpenAssistant?: () => void;
+  onCopyIosCalendarLink?: () => void;
 }
 
 export function LeftMenuBar({
@@ -23,6 +27,10 @@ export function LeftMenuBar({
   onCloseMobileDrawer,
   onSyncCalendar,
   onExportPdf,
+  onOpenImport,
+  onOpenAiReview,
+  onOpenAssistant,
+  onCopyIosCalendarLink,
 }: LeftMenuBarProps) {
   // Filtra as tarefas de alta prioridade (importantes)
   const importantTasks = useMemo(() => {
@@ -259,8 +267,49 @@ export function LeftMenuBar({
         )}
       </div>
 
+      {(onOpenImport || onOpenAiReview || onOpenAssistant) && (
+        <div className="flex flex-col gap-2 pt-1 border-t border-[#F1EFEA] dark:border-[#27272A]">
+          {onOpenAssistant && (
+            <button
+              type="button"
+              onClick={() => {
+                onOpenAssistant();
+                onCloseMobileDrawer?.();
+              }}
+              className="flex min-h-[44px] w-full cursor-pointer items-center justify-center gap-2 rounded-xl border border-[#FDE68A]/50 bg-gradient-to-r from-[#0F0F12] via-[#450A0A] to-[#991B1B] px-3 text-[12px] font-bold text-white shadow-xs transition-all hover:opacity-95 active:scale-95"
+            >
+              <span>🤖 Assistente IA (Ação Rápida)</span>
+            </button>
+          )}
+          {onOpenImport && (
+            <button
+              type="button"
+              onClick={() => {
+                onOpenImport();
+                onCloseMobileDrawer?.();
+              }}
+              className="flex min-h-[44px] w-full cursor-pointer items-center justify-center gap-2 rounded-xl border border-[#E6E2DA] bg-[#FAF7F2] px-3 text-[12px] font-bold text-[#0F0F12] transition-colors hover:bg-[#F1ECE2] active:scale-95 dark:border-[#27272A] dark:bg-[#27272A] dark:text-white"
+            >
+              <span>📥 Importar Planejamento</span>
+            </button>
+          )}
+          {onOpenAiReview && (
+            <button
+              type="button"
+              onClick={() => {
+                onOpenAiReview();
+                onCloseMobileDrawer?.();
+              }}
+              className="flex min-h-[44px] w-full cursor-pointer items-center justify-center gap-2 rounded-xl border border-[#E5D3D6] bg-[#FDF4F5] px-3 text-[12px] font-bold text-[#6F1D2B] transition-colors hover:bg-[#FCE7E9] active:scale-95 dark:border-[#4C1D24] dark:bg-[#3B1219] dark:text-[#FCA5A5]"
+            >
+              <span>✨ Fechamento do Mês (IA)</span>
+            </button>
+          )}
+        </div>
+      )}
+
       {/* Ações rápidas de exportação para Calendário (.ics) e Arquivo PDF (.pdf) */}
-      {(onSyncCalendar || onExportPdf) && (
+      {(onSyncCalendar || onExportPdf || onCopyIosCalendarLink) && (
         <div className="flex flex-col gap-2 pt-1 border-t border-[#F1EFEA] dark:border-[#27272A]">
           {onExportPdf && (
             <button
@@ -279,6 +328,18 @@ export function LeftMenuBar({
               className="font-heading flex min-h-[38px] w-full cursor-pointer items-center justify-center gap-2 rounded-xl border border-[#E5E4E0] bg-[#F8F7F4] px-3 text-[11px] font-bold text-[#0F0F12] transition-colors hover:bg-[#ECE9E2] active:scale-95 dark:border-[#27272A] dark:bg-[#1C1C22] dark:text-[#FAFAFA]"
             >
               <span>📲 Sincronizar com Calendário (.ics)</span>
+            </button>
+          )}
+          {onCopyIosCalendarLink && (
+            <button
+              type="button"
+              onClick={() => {
+                onCopyIosCalendarLink();
+                onCloseMobileDrawer?.();
+              }}
+              className="font-heading flex min-h-[38px] w-full cursor-pointer items-center justify-center gap-2 rounded-xl border border-[#E5E4E0] bg-white px-3 text-[11px] font-bold text-[#6F1D2B] transition-colors hover:bg-[#FDF4F5] active:scale-95 dark:border-[#27272A] dark:bg-[#18181B] dark:text-[#FCA5A5]"
+            >
+              <span>🔗 Copiar Link de Sincronização iOS</span>
             </button>
           )}
         </div>

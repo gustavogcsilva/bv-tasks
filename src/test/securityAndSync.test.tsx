@@ -1,6 +1,7 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it } from 'vitest';
 import App from '../App';
+import { isIosSafariNotStandalone } from '../components/IosInstallBanner';
 import {
   isValidEmail,
   validateName,
@@ -189,9 +190,9 @@ describe('Barra de Menu Lateral (Quem está logado, Mini Status Bar e Tarefas Im
   it('deve exibir a tarefa importante com "O que faz:" e clicando nela ir direto para a tarefa', () => {
     render(<App />);
 
-    // Verifica que a tarefa importante está listada na barra de menu
-    expect(screen.getByText('Revisão Contratual Urgente')).toBeInTheDocument();
-    expect(screen.getByText(/Analisar cláusulas de entrega/i)).toBeInTheDocument();
+    // Verifica que a tarefa importante está listada na barra de menu (e também na Visão Geral Global)
+    expect(screen.getAllByText('Revisão Contratual Urgente').length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText(/Analisar cláusulas de entrega/i).length).toBeGreaterThanOrEqual(1);
     expect(screen.getByText('Ver na agenda →')).toBeInTheDocument();
 
     // Clica no card da tarefa importante
@@ -293,7 +294,34 @@ describe('Sincronização Mobile (Online / Offline)', () => {
     expect(screen.getByText(/Integridade Local:/i)).toBeInTheDocument();
     expect(screen.getByText(/100% íntegro/i)).toBeInTheDocument();
     expect(
-      screen.getByRole('button', { name: /Exportar Todas as Tarefas/i }),
+      screen.getByRole('button', { name: /Gerar e Exportar Todas as Tarefas como PDF/i }),
     ).toBeInTheDocument();
+  });
+
+  it('deve detectar Safari no iOS fora do modo standalone para exibir o banner de instalação', () => {
+    const iosSafariUa =
+      'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1';
+
+    expect(
+      isIosSafariNotStandalone({
+        userAgent: iosSafariUa,
+        standalone: false,
+      }),
+    ).toBe(true);
+
+    expect(
+      isIosSafariNotStandalone({
+        userAgent: iosSafariUa,
+        standalone: true,
+      }),
+    ).toBe(false);
+
+    expect(
+      isIosSafariNotStandalone({
+        userAgent:
+          'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) CriOS/130.0.0.0 Mobile/15E148 Safari/604.1',
+        standalone: false,
+      }),
+    ).toBe(false);
   });
 });

@@ -1,8 +1,8 @@
 {
   "id": "/",
-  "name": "BVS Special — Executive Planner",
-  "short_name": "BVS Special",
-  "description": "Planejamento executivo com Calendário, Pastas, Câmera/PDFs, Notificações e Sincronização com Calendário do Celular (iPhone e Android).",
+  "name": "BVS Special — B V Tasks Executive Planner",
+  "short_name": "B V Tasks",
+  "description": "Planejamento executivo com Visão Global, Importação em Lote, Fechamento IA com Gemini, PDF Executivo e Sincronização SQL Multi-Dispositivo.",
   "lang": "pt-BR",
   "start_url": "/",
   "scope": "/",
@@ -35,6 +35,35 @@
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Nova Tarefa",
+      "short_name": "Nova Tarefa",
+      "url": "/?action=new-task"
+    },
+    {
+      "name": "Importar Planilha",
+      "short_name": "Importar",
+      "url": "/?action=import"
+    },
+    {
+      "name": "Assistente IA",
+      "short_name": "Chat IA",
+      "description": "Abrir o Mini-Chatbot Assistente de Tarefas",
+      "url": "/?action=chat",
+      "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Fechamento IA",
+      "short_name": "IA Mês",
+      "url": "/?action=ai-review"
+    },
+    {
+      "name": "Tarefas de Hoje",
+      "short_name": "Hoje",
+      "url": "/?filter=today"
     }
   ]
 }

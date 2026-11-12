@@ -48,4 +48,45 @@ Existiam **dois motivos técnicos** na hospedagem do Render:
 4. Na aba **Environment**, adicione a variável:
    - Nome (`Key`): `DATABASE_URL`
    - Valor (`Value`): cole o link `postgresql://...` que você copiou.
-5. Salve! Assim que terminar de publicar, aparecerá **🟢 Banco SQL PostgreSQL Conectado** na tela de login, e sua conta funcionará em qualquer computador, iPhone ou Android!
+5. Para ativar o **Fechamento do Mês com IA (Google Gemini)**, adicione também no **Environment**:
+   - Nome (`Key`): `GEMINI_API_KEY`
+   - Valor (`Value`): sua chave gratuita gerada no Google AI Studio (`aistudio.google.com`).
+6. Salve! Assim que terminar de publicar, aparecerá **🟢 Banco SQL PostgreSQL Conectado** na tela de login, e sua conta funcionará em qualquer computador, iPhone ou Android!
+
+---
+
+## 4. Novidades de Uso Diário (Celular, iPhone, Excel, IA e PDF Executivo) 📱✨
+
+### 1. Visão Geral Global + Menu Mobile com 1 Mão
+- Ao abrir o sistema, você já enxerga **todas as tarefas criadas de uma só vez** na **Visão Geral Global**, com busca rápida, filtros por **Status**, **Prioridade** e **Categoria**, além de poder alternar entre **Lista/Cards** (ótimo no celular) e **Tabela/Grid** (ideal no computador).
+- No celular, o menu principal fica fixo na parte de baixo da tela (`Visão Geral`, `Agenda`, `+ Nova`, `Importar` e `IA Mês`) respeitando a barra inferior e o entalhe (*notch*) do iPhone.
+
+### 2. Abrir com 1 Toque no iPhone (Tela de Início + App Atalhos da Apple)
+- Abra o site no **Safari** do iPhone, toque no botão **Compartilhar** (quadradinho com seta para cima) → **Adicionar à Tela de Início**. O app abrirá em tela cheia, sem barra do navegador.
+- Você também pode criar atalhos no app **Atalhos (Shortcuts)** do iPhone usando links diretos:
+  - Criar nova tarefa direto: `SEU-SITE/?action=new-task`
+  - Abrir Assistente IA (Chat): `SEU-SITE/?action=chat`
+  - Abrir Importação em lote: `SEU-SITE/?action=import`
+  - Abrir Fechamento IA do mês: `SEU-SITE/?action=ai-review`
+  - Filtrar só as tarefas de Hoje: `SEU-SITE/?filter=today`
+
+### 3. Sincronização Direta com o Calendário do iPhone (Apple Calendar + `webcal://`)
+- **Envio Instantâneo (1 Toque):** Ao tocar em **📲 Sincronizar (.ics)** no iPhone, o app abre a folha nativa de compartilhamento da Apple para enviar todas as tarefas direto para o app **Calendário**.
+- **Assinatura Automática (`webcal://`):** Na barra lateral ou na **Central de Sincronização**, toque em **"🔗 Copiar Link de Sincronização iOS"**. Depois, no iPhone, vá em **Ajustes → Apps → Calendário → Contas → Adicionar Conta → Outra → Adicionar Calendário Assinado** e cole o link para manter sua agenda sincronizada automaticamente!
+
+### 4. Importar Planejamento em Lote (Excel, CSV, JSON ou ChatGPT)
+- No botão **📥 Importar**, você pode:
+  - **Baixar Planilha Modelo (.xlsx)** pronta para preencher no Excel ou Google Planilhas.
+  - **Copiar Prompt para IA**, colar no ChatGPT para ele montar todo o seu mês e depois importar ou colar o JSON gerado.
+  - Conferir tudo na tela de pré-visualização antes de salvar todas as tarefas de uma só vez no banco SQL.
+
+### 5. Mini-Chatbot Assistente de Ação Rápida (Exclusivo para Tarefas)
+- Toque em **🤖 Assistente IA** (no botão flutuante do computador ou na barra inferior do celular) e peça em linguagem natural, por exemplo: *"Divida minha meta da semana em 3 tarefas de Trabalho"* ou *"Organize minha rotina de estudos às 19h"*.
+- O assistente gera os cards prontos dentro do chat e você adiciona tudo ao cronograma com 1 clique em **"Confirmar e Adicionar ao Cronograma"**.
+
+### 6. Fechamento Inteligente do Mês com IA (Google Gemini)
+- Em **✨ IA Mês**, o sistema calcula suas estatísticas do mês (concluídas, taxa de entrega e onde houve gargalo) e pede ao **Google Gemini** um diagnóstico objetivo, **3 próximos passos** práticos e sugestões para o próximo mês.
+- Com um único clique em **"Aplicar Sugestões e Migrar Pendentes"**, as novas tarefas sugeridas são criadas e tudo o que ficou pendente é transferido automaticamente para o próximo mês.
+
+### 7. Novo Relatório Executivo em PDF
+- Ao clicar em **Exportar PDF**, o aplicativo gera um PDF moderno com faixa superior em Bordeaux & Dourado, o brasão **BVS Special**, **4 cards de indicadores (KPIs)** no topo, tabela organizada com status/prioridades coloridas, numeração `Página X de Y` e suporte direto ao compartilhamento nativo no iPhone (WhatsApp, Arquivos, E-mail).

@@ -38,6 +38,94 @@ export interface Task {
 
 export type TaskDraft = Omit<Task, 'id' | 'isCompleted' | 'createdAt'>;
 
+export interface BulkImportRow {
+  rowNumber: number;
+  title: string;
+  description?: string;
+  date: string;
+  time?: string;
+  scope: Scope;
+  priority: Priority;
+  rawDate?: string;
+  rawCategory?: string;
+  rawPriority?: string;
+  isValid: boolean;
+  errors: string[];
+}
+
+export interface MonthlyScopeStats {
+  total: number;
+  completed: number;
+  pending: number;
+}
+
+export interface MonthlyReviewStats {
+  month: string;
+  total: number;
+  completed: number;
+  pending: number;
+  completionRate: number;
+  highPriorityPending: number;
+  bottleneckScope: string | null;
+  byScope: Record<Scope, MonthlyScopeStats>;
+}
+
+export interface SuggestedMonthlyTask {
+  title: string;
+  description?: string;
+  date: string;
+  time?: string;
+  priority: Priority;
+  scope: Scope;
+}
+
+export interface MonthlyReviewPayload {
+  diagnostico: string;
+  proximosPassos: string[];
+  tarefasSugeridasProximoMes: SuggestedMonthlyTask[];
+}
+
+export interface MonthlyReviewResponse {
+  ok: boolean;
+  month?: string;
+  nextMonth?: string;
+  stats?: MonthlyReviewStats;
+  pendingTasksCount?: number;
+  pendingTaskIds?: string[];
+  review?: MonthlyReviewPayload;
+  missingApiKey?: boolean;
+  offline?: boolean;
+  error?: string;
+}
+
+export interface AssistantSuggestedTask {
+  title: string;
+  description?: string;
+  date: string;
+  time?: string;
+  category: 'Trabalho' | 'Pessoal' | 'Estudo' | string;
+  scope: Scope;
+  priority: Priority;
+}
+
+export interface AssistantChatMessage {
+  id: string;
+  role: 'user' | 'assistant';
+  text: string;
+  createdAt: string;
+  suggestedTasks?: AssistantSuggestedTask[];
+  applied?: boolean;
+}
+
+export interface AssistantResponse {
+  ok: boolean;
+  reply?: string;
+  suggestedTasks?: AssistantSuggestedTask[];
+  missingApiKey?: boolean;
+  offline?: boolean;
+  error?: string;
+}
+
 export interface UserAccount {
   id: string;
   name: string;

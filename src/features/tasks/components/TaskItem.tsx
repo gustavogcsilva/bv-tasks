@@ -30,10 +30,12 @@ const priorityLabels = {
 interface TaskItemProps {
   task: Task;
   folder?: TaskFolder;
+  showDateBadge?: boolean;
   isRecentlyCreated?: boolean;
   isHighlighted?: boolean;
   onToggle: () => void;
   onDelete: () => void;
+  onOpenDetails?: () => void;
   onAddAttachment?: (attachment: TaskAttachment) => void;
   onRemoveAttachment?: (attachmentId: string) => void;
 }
@@ -41,10 +43,12 @@ interface TaskItemProps {
 export function TaskItem({
   task,
   folder,
+  showDateBadge = false,
   isRecentlyCreated,
   isHighlighted,
   onToggle,
   onDelete,
+  onOpenDetails,
   onAddAttachment,
   onRemoveAttachment,
 }: TaskItemProps) {
@@ -131,16 +135,26 @@ export function TaskItem({
               ● Prioridade {priorityLabels[task.priority]}
             </span>
           </div>
-          {task.time ? (
-            <span className="rounded-md bg-[#F8F7F4] px-2.5 py-0.5 text-[12px] font-bold text-[#3F3F46] dark:bg-[#27272A] dark:text-[#D4D4D8]">
-              ⏰ {task.time}
-            </span>
-          ) : null}
+          <div className="flex flex-wrap items-center gap-1.5">
+            {showDateBadge && task.date ? (
+              <span className="rounded-md bg-[#FDF4F5] px-2.5 py-0.5 text-[12px] font-bold text-[#6F1D2B] dark:bg-[#3A161D] dark:text-[#FCA5A5]">
+                📅 {task.date.split('-').reverse().join('/')}
+              </span>
+            ) : null}
+            {task.time ? (
+              <span className="rounded-md bg-[#F8F7F4] px-2.5 py-0.5 text-[12px] font-bold text-[#3F3F46] dark:bg-[#27272A] dark:text-[#D4D4D8]">
+                ⏰ {task.time}
+              </span>
+            ) : null}
+          </div>
         </div>
 
         <div>
           <h3
+            onClick={onOpenDetails}
             className={`font-heading line-clamp-2 text-[16px] font-bold leading-snug tracking-tight ${
+              onOpenDetails ? 'cursor-pointer hover:text-[#6F1D2B] dark:hover:text-[#FCA5A5]' : ''
+            } ${
               task.isCompleted
                 ? 'text-[#71717A] line-through dark:text-[#71717A]'
                 : 'text-[#0F0F12] dark:text-[#FAFAFA]'
@@ -276,14 +290,14 @@ export function TaskItem({
                 <button
                   type="button"
                   onClick={onDelete}
-                  className="min-h-[34px] cursor-pointer rounded-lg bg-[#FDECEC] px-3 text-[12px] font-bold text-[#B91C1C] transition-colors hover:bg-[#FADADA] active:scale-95"
+                  className="min-h-[44px] sm:min-h-[34px] cursor-pointer rounded-lg bg-[#FDECEC] px-3 text-[12px] font-bold text-[#B91C1C] transition-colors hover:bg-[#FADADA] active:scale-95"
                 >
                   Confirmar exclusão
                 </button>
                 <button
                   type="button"
                   onClick={() => setIsConfirmingDelete(false)}
-                  className="min-h-[34px] cursor-pointer px-2 text-[12px] font-semibold text-[#71717A] hover:text-[#0F0F12] dark:hover:text-white"
+                  className="min-h-[44px] sm:min-h-[34px] cursor-pointer px-2.5 text-[12px] font-semibold text-[#71717A] hover:text-[#0F0F12] dark:hover:text-white"
                 >
                   Cancelar
                 </button>
@@ -292,7 +306,7 @@ export function TaskItem({
               <button
                 type="button"
                 onClick={() => setIsConfirmingDelete(true)}
-                className="min-h-[34px] cursor-pointer px-1.5 text-[12px] font-semibold text-[#B91C1C] transition-opacity hover:opacity-80 active:scale-95 dark:text-[#F87171]"
+                className="min-h-[44px] min-w-[44px] sm:min-h-[34px] sm:min-w-0 cursor-pointer px-2 text-[12px] font-semibold text-[#B91C1C] transition-opacity hover:opacity-80 active:scale-95 dark:text-[#F87171]"
               >
                 Excluir
               </button>
@@ -303,14 +317,14 @@ export function TaskItem({
                 <button
                   type="button"
                   onClick={() => cameraInputRef.current?.click()}
-                  className="min-h-[32px] cursor-pointer rounded-lg bg-[#FEE2E2] px-2.5 text-[11px] font-bold text-[#991B1B] transition-colors hover:bg-[#FECACA] active:scale-95 dark:bg-[#3B1219] dark:text-[#FCA5A5]"
+                  className="min-h-[44px] sm:min-h-[34px] cursor-pointer rounded-lg bg-[#FEE2E2] px-2.5 text-[11px] font-bold text-[#991B1B] transition-colors hover:bg-[#FECACA] active:scale-95 dark:bg-[#3B1219] dark:text-[#FCA5A5]"
                 >
                   📷 Câmera
                 </button>
                 <button
                   type="button"
                   onClick={() => fileInputRef.current?.click()}
-                  className="min-h-[32px] cursor-pointer rounded-lg bg-[#F1EFEA] px-2.5 text-[11px] font-bold text-[#27272A] transition-colors hover:bg-[#E5E2DC] active:scale-95 dark:bg-[#27272A] dark:text-[#E4E4E7]"
+                  className="min-h-[44px] sm:min-h-[34px] cursor-pointer rounded-lg bg-[#F1EFEA] px-2.5 text-[11px] font-bold text-[#27272A] transition-colors hover:bg-[#E5E2DC] active:scale-95 dark:bg-[#27272A] dark:text-[#E4E4E7]"
                 >
                   📎 Foto/PDF
                 </button>
@@ -322,7 +336,7 @@ export function TaskItem({
               type="button"
               onClick={handleNotifyPhone}
               title="Receber notificação desta tarefa no celular"
-              className="min-h-[32px] cursor-pointer rounded-lg bg-[#F1EFEA] px-2.5 text-[11px] font-bold text-[#27272A] transition-colors hover:bg-[#E5E2DC] active:scale-95 dark:bg-[#27272A] dark:text-[#E4E4E7]"
+              className="min-h-[44px] sm:min-h-[34px] cursor-pointer rounded-lg bg-[#F1EFEA] px-2.5 text-[11px] font-bold text-[#27272A] transition-colors hover:bg-[#E5E2DC] active:scale-95 dark:bg-[#27272A] dark:text-[#E4E4E7]"
             >
               🔔 Notificar
             </button>
@@ -331,7 +345,7 @@ export function TaskItem({
               type="button"
               onClick={handleSyncCalendar}
               title="Sincronizar com o Calendário do iPhone / Android (.ics)"
-              className="min-h-[32px] cursor-pointer rounded-lg bg-[#F1EFEA] px-2.5 text-[11px] font-bold text-[#27272A] transition-colors hover:bg-[#E5E2DC] active:scale-95 dark:bg-[#27272A] dark:text-[#E4E4E7]"
+              className="min-h-[44px] sm:min-h-[34px] cursor-pointer rounded-lg bg-[#F1EFEA] px-2.5 text-[11px] font-bold text-[#27272A] transition-colors hover:bg-[#E5E2DC] active:scale-95 dark:bg-[#27272A] dark:text-[#E4E4E7]"
             >
               📅 Calendário (.ics)
             </button>
@@ -340,7 +354,7 @@ export function TaskItem({
               type="button"
               onClick={handleExportTaskPdf}
               title="Gerar e exportar esta tarefa como arquivo PDF (.pdf)"
-              className="min-h-[32px] cursor-pointer rounded-lg bg-[#FEE2E2] px-2.5 text-[11px] font-bold text-[#991B1B] transition-colors hover:bg-[#FECACA] active:scale-95 dark:bg-[#3B1219] dark:text-[#FCA5A5]"
+              className="min-h-[44px] sm:min-h-[34px] cursor-pointer rounded-lg bg-[#FEE2E2] px-2.5 text-[11px] font-bold text-[#991B1B] transition-colors hover:bg-[#FECACA] active:scale-95 dark:bg-[#3B1219] dark:text-[#FCA5A5]"
             >
               📄 Exportar PDF
             </button>
@@ -350,7 +364,7 @@ export function TaskItem({
               target="_blank"
               rel="noreferrer"
               title="Adicionar ao Google Calendar"
-              className="inline-flex min-h-[32px] items-center rounded-lg bg-[#F1EFEA] px-2.5 text-[11px] font-bold text-[#27272A] transition-colors hover:bg-[#E5E2DC] dark:bg-[#27272A] dark:text-[#E4E4E7]"
+              className="inline-flex min-h-[44px] sm:min-h-[34px] items-center rounded-lg bg-[#F1EFEA] px-2.5 text-[11px] font-bold text-[#27272A] transition-colors hover:bg-[#E5E2DC] dark:bg-[#27272A] dark:text-[#E4E4E7]"
             >
               Google Agenda
             </a>
@@ -361,7 +375,7 @@ export function TaskItem({
             role="checkbox"
             aria-checked={task.isCompleted}
             onClick={onToggle}
-            className={`min-h-[34px] cursor-pointer rounded-[10px] px-3.5 text-[12px] font-bold transition-all active:scale-95 ${
+            className={`min-h-[44px] min-w-[44px] sm:min-h-[36px] cursor-pointer rounded-[10px] px-4 text-[12px] font-bold transition-all active:scale-95 ${
               task.isCompleted
                 ? 'bg-[#E8F4EE] text-[#15803D] dark:bg-[#143323] dark:text-[#86EFAC]'
                 : 'bg-[#0F0F12] text-white hover:bg-[#27272A] dark:bg-[#991B1B] dark:hover:bg-[#7F1D1D]'

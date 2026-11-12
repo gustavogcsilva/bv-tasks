@@ -12,6 +12,7 @@ import type {
   UserAccount,
 } from '../features/tasks/types/task.types';
 import {
+  apiBulkTasks,
   apiCheckHealth,
   apiClearUserData,
   apiDeleteFolder,
@@ -71,7 +72,10 @@ export interface TaskStore {
   pendingOfflineSync: boolean;
   dbEngine: DbEngineStatus;
   sqlPersistent: boolean;
+  aiEnabled: boolean;
   addTask: (draft: TaskDraft) => Task;
+  addTasksBulk: (drafts: TaskDraft[]) => Promise<{ ok: boolean; count: number; synced: boolean; error?: string }>;
+  upsertTasksBulk: (tasksToUpsert: Task[]) => Promise<{ ok: boolean; count: number; synced: boolean; error?: string }>;
   toggleTask: (id: string) => void;
   deleteTask: (id: string) => void;
   markTaskNotified: (id: string) => void;
@@ -134,6 +138,7 @@ export const useTaskStore = create<TaskStore>()(
       pendingOfflineSync: false,
       dbEngine: 'offline',
       sqlPersistent: false,
+      aiEnabled: false,
 
       addTask: (draft) => {
         const created: Task = {
@@ -149,6 +154,49 @@ export const useTaskStore = create<TaskStore>()(
           if (!saved) set({ pendingOfflineSync: true });
         });
         return created;
+      },
+
+      addTasksBulk: async (drafts) => {
+        if (!Array.isArray(drafts) || drafts.length === 0) {
+          return { ok: false, count: 0, synced: false, error: 'Nenhuma tarefa válida selecionada.' };
+        }
+        const now = Date.now();
+        const createdTasks: Task[] = drafts.map((draft, idx) => ({
+          ...draft,
+          id: generateId(),
+          isCompleted: false,
+          createdAt: new Date(now + idx).toISOString(),
+        }));
+        return get().upsertTasksBulk(createdTasks);
+      },
+
+      upsertTasksBulk: async (tasksToUpsert) => {
+        if (!Array.isArray(tasksToUpsert) || tasksToUpsert.length === 0) {
+          return { ok: false, count: 0, synced: false, error: 'Nenhuma tarefa para gravar.' };
+        }
+        const upsertMap = new Map(tasksToUpsert.map((t) => [t.id, t]));
+        const existingUpdated = get().tasks.map((t) => upsertMap.get(t.id) ?? t);
+        const existingIds = new Set(get().tasks.map((t) => t.id));
+        const brandNew = tasksToUpsert.filter((t) => !existingIds.has(t.id));
+        set({ tasks: [...existingUpdated, ...brandNew] });
+
+        const apiRes = await apiBulkTasks(tasksToUpsert);
+        if (apiRes.ok) {
+          if (Array.isArray(apiRes.tasks)) {
+            set({ tasks: apiRes.tasks, pendingOfflineSync: false });
+          }
+          return { ok: true, count: tasksToUpsert.length, synced: true };
+        }
+        if (apiRes.offline) {
+          set({ pendingOfflineSync: true });
+          return { ok: true, count: tasksToUpsert.length, synced: false };
+        }
+        return {
+          ok: true,
+          count: tasksToUpsert.length,
+          synced: false,
+          error: apiRes.error,
+        };
       },
 
       toggleTask: (id) => {
@@ -624,6 +672,7 @@ export const useTaskStore = create<TaskStore>()(
         set({
           dbEngine: health.engine,
           sqlPersistent: health.sqlPersistent,
+          aiEnabled: health.aiEnabled,
         });
       },
 

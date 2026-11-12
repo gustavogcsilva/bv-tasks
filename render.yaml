@@ -21,3 +21,5 @@ services:
         fromDatabase:
           name: bv-tasks-sql
           property: connectionString
+      - key: GEMINI_API_KEY
+        sync: false

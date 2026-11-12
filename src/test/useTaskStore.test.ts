@@ -5,6 +5,12 @@ import {
   generateTasksPdfBytes,
   getGoogleCalendarUrl,
 } from '../services/notificationsAndCalendar';
+import {
+  buildAiSchedulePrompt,
+  parseImportedDate,
+  parseImportedTime,
+  parseJsonScheduleText,
+} from '../services/bulkImport';
 import type { Task } from '../features/tasks/types/task.types';
 
 describe('useTaskStore — Autenticação (Google, E-mail, Recuperação), Tema Claro/Escuro, Calendário (.ics) e Tarefas', () => {
@@ -92,10 +98,51 @@ describe('useTaskStore — Autenticação (Google, E-mail, Recuperação), Tema 
 
     const pdfBytes = generateTasksPdfBytes([task], { userName: 'Gustavo Geraldo' });
     const pdfText = new TextDecoder().decode(pdfBytes);
-    expect(pdfText.startsWith('%PDF-1.4')).toBe(true);
+    expect(pdfText).toMatch(/^%PDF-1\./);
     expect(pdfText).toContain('BVS SPECIAL');
     expect(pdfText).toContain('Gustavo Geraldo');
     expect(pdfText).toContain(String(new Date().getFullYear()));
+  });
+
+  it('deve validar datas seriais do Excel, DD/MM/YYYY, horários decimais e JSON de importação em lote', () => {
+    // 46333 no sistema serial Excel corresponde a 2026-11-07 sem desvio de fuso
+    expect(parseImportedDate(46333)).toEqual({ date: '2026-11-07', valid: true });
+    expect(parseImportedDate('07/11/2026')).toEqual({ date: '2026-11-07', valid: true });
+    expect(parseImportedDate('2026-11-15')).toEqual({ date: '2026-11-15', valid: true });
+    expect(parseImportedDate('31/02/2026').valid).toBe(false);
+
+    // 0.375 de um dia = 09:00
+    expect(parseImportedTime(0.375)).toEqual({ time: '09:00', valid: true });
+    expect(parseImportedTime('930')).toEqual({ time: '09:30', valid: true });
+
+    const parsed = parseJsonScheduleText(
+      JSON.stringify([
+        {
+          titulo: 'Entrega de Relatório Mensal',
+          descricao: 'Consolidar KPIs',
+          data: '20/11/2026',
+          hora: '08:45',
+          categoria: 'Trabalho',
+          prioridade: 'Alta',
+        },
+        {
+          titulo: '',
+          data: '99/99/2026',
+        },
+      ]),
+    );
+
+    expect(parsed).toHaveLength(2);
+    expect(parsed[0]).toMatchObject({
+      title: 'Entrega de Relatório Mensal',
+      date: '2026-11-20',
+      time: '08:45',
+      scope: 'work',
+      priority: 'high',
+      isValid: true,
+    });
+    expect(parsed[1].isValid).toBe(false);
+    expect(buildAiSchedulePrompt()).toContain('YYYY-MM-DD');
   });
 
   it('deve ordenar tarefas por status de conclusão, Prioridade (Alta > Média > Baixa) e horário', () => {

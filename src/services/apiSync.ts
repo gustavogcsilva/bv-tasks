@@ -1,4 +1,10 @@
-import type { Task, TaskFolder, UserAccount } from '../features/tasks/types/task.types';
+import type {
+  AssistantResponse,
+  MonthlyReviewResponse,
+  Task,
+  TaskFolder,
+  UserAccount,
+} from '../features/tasks/types/task.types';
 
 const TOKEN_KEY = '__bv_tasks_sql_token_v8__';
 const CLEAN_MIGRATION_KEY = '__bv_tasks_clean_slate_v8__';
@@ -116,24 +122,27 @@ export async function apiCheckHealth(): Promise<{
   ok: boolean;
   engine: DbEngineStatus;
   sqlPersistent: boolean;
+  aiEnabled: boolean;
 }> {
   const res = await safeFetchJson<{
     ok?: boolean;
     engine?: string;
     sqlPersistent?: boolean;
+    aiEnabled?: boolean;
   }>('/api/health', { method: 'GET' });
 
   if (res.backendMissing) {
-    return { ok: false, engine: 'static-no-backend', sqlPersistent: false };
+    return { ok: false, engine: 'static-no-backend', sqlPersistent: false, aiEnabled: false };
   }
   if (res.offline || !res.data) {
-    return { ok: false, engine: 'offline', sqlPersistent: false };
+    return { ok: false, engine: 'offline', sqlPersistent: false, aiEnabled: false };
   }
   const engine = res.data.engine === 'postgresql' ? 'postgresql' : 'local-file';
   return {
     ok: Boolean(res.ok && res.data.ok),
     engine,
     sqlPersistent: Boolean(res.data.sqlPersistent),
+    aiEnabled: Boolean(res.data.aiEnabled),
   };
 }
 
@@ -480,4 +489,165 @@ export async function apiClearUserData(): Promise<boolean> {
     headers: getAuthHeaders(),
   });
   return Boolean(res.ok);
+}
+
+/**
+ * Insere ou atualiza várias tarefas em lote em uma única transação no Banco SQL (POST /api/tasks/bulk)
+ */
+export async function apiBulkTasks(tasks: Task[]): Promise<{
+  ok: boolean;
+  tasks?: Task[];
+  insertedCount?: number;
+  offline?: boolean;
+  error?: string;
+}> {
+  if (!getStoredToken()) {
+    return { ok: false, offline: true, error: 'Sessão local sem token remoto.' };
+  }
+  const res = await safeFetchJson<{
+    ok?: boolean;
+    insertedCount?: number;
+    tasks?: Task[];
+    error?: string;
+  }>('/api/tasks/bulk', {
+    method: 'POST',
+    headers: getAuthHeaders(),
+    body: JSON.stringify({ tasks }),
+  });
+
+  if (res.offline) {
+    return { ok: false, offline: true, error: 'Sem conexão com o servidor no momento.' };
+  }
+  if (!res.ok || !res.data?.ok) {
+    return {
+      ok: false,
+      error: res.data?.error || 'Falha ao gravar tarefas em lote no servidor.',
+    };
+  }
+  return {
+    ok: true,
+    insertedCount: res.data.insertedCount ?? tasks.length,
+    tasks: Array.isArray(res.data.tasks) ? res.data.tasks : undefined,
+  };
+}
+
+/**
+ * Solicita o Fechamento Inteligente do Mês com Google Gemini 2.5 Flash (POST /api/ai/monthly-review)
+ */
+export async function apiRequestMonthlyReview(month: string): Promise<MonthlyReviewResponse> {
+  if (!getStoredToken()) {
+    return {
+      ok: false,
+      offline: true,
+      error: 'Conecte-se ao servidor autenticado para gerar análises com a IA Gemini.',
+    };
+  }
+
+  const res = await safeFetchJson<MonthlyReviewResponse>('/api/ai/monthly-review', {
+    method: 'POST',
+    headers: getAuthHeaders(),
+    body: JSON.stringify({ month }),
+  });
+
+  if (res.offline || !res.data) {
+    return {
+      ok: false,
+      offline: true,
+      error: res.backendMissing
+        ? 'Backend Node não detectado neste domínio (verifique o Web Service no Render).'
+        : 'Servidor indisponível ou sem conexão de internet no momento.',
+    };
+  }
+
+  return res.data;
+}
+
+/**
+ * Solicita ao backend o link assinado de assinatura automática do Calendário iOS (webcal:// e https://)
+ */
+export async function apiGetCalendarFeedUrl(): Promise<{
+  ok: boolean;
+  webcalUrl?: string;
+  httpsUrl?: string;
+  feedToken?: string;
+  offline?: boolean;
+  error?: string;
+}> {
+  if (!getStoredToken()) {
+    return {
+      ok: false,
+      offline: true,
+      error: 'Conecte-se à sua conta no servidor para gerar o link webcal:// do iPhone.',
+    };
+  }
+
+  const res = await safeFetchJson<{
+    ok?: boolean;
+    feedToken?: string;
+    feedPath?: string;
+    error?: string;
+  }>('/api/calendar/feed-token', {
+    method: 'GET',
+    headers: getAuthHeaders(),
+  });
+
+  if (res.offline || !res.data?.ok || !res.data.feedPath) {
+    return {
+      ok: false,
+      offline: Boolean(res.offline),
+      error:
+        res.data?.error ||
+        'Não foi possível obter o link de sincronização do calendário no momento.',
+    };
+  }
+
+  const origin =
+    typeof window !== 'undefined' && window.location?.origin
+      ? window.location.origin
+      : 'https://bv-tasks.onrender.com';
+  const baseHost = (API_BASE || origin).replace(/\/+$/, '');
+  const httpsUrl = `${baseHost}${res.data.feedPath}`;
+  const webcalUrl = httpsUrl.replace(/^https?:\/\//i, 'webcal://');
+
+  return {
+    ok: true,
+    feedToken: res.data.feedToken,
+    httpsUrl,
+    webcalUrl,
+  };
+}
+
+/**
+ * Envia mensagem para o Mini-Chatbot Assistente de Ação Rápida (POST /api/ai/assistant)
+ */
+export async function apiAskTaskAssistant(
+  message: string,
+  currentDate: string,
+  history: Array<{ role: 'user' | 'assistant'; text: string }> = [],
+): Promise<AssistantResponse> {
+  if (!getStoredToken()) {
+    return {
+      ok: false,
+      offline: true,
+      error: 'Conecte-se ao servidor autenticado para usar o Assistente IA.',
+    };
+  }
+
+  const res = await safeFetchJson<AssistantResponse>('/api/ai/assistant', {
+    method: 'POST',
+    headers: getAuthHeaders(),
+    body: JSON.stringify({ message, currentDate, history }),
+  });
+
+  if (res.offline || !res.data) {
+    return {
+      ok: false,
+      offline: true,
+      error: res.backendMissing
+        ? 'Backend Node não detectado neste domínio.'
+        : 'Servidor indisponível ou sem conexão no momento.',
+    };
+  }
+
+  return res.data;
 }

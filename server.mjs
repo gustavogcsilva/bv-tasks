@@ -5,6 +5,7 @@ import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { execSync } from 'node:child_process';
 import pg from 'pg';
+import { GoogleGenAI, Type } from '@google/genai';
 
 const { Pool } = pg;
 
@@ -135,6 +136,111 @@ function verifySecret(secret, salt, storedHash) {
   } catch {
     return false;
   }
+}
+
+export function createCalendarFeedToken(userId) {
+  const cleanId = String(userId || '').trim();
+  const payload = `cal|${cleanId}`;
+  const sig = crypto.createHmac('sha256', SERVER_HMAC_SECRET).update(payload).digest('hex');
+  return Buffer.from(`${cleanId}|${sig}`, 'utf-8').toString('base64url');
+}
+
+export function verifyCalendarFeedToken(token) {
+  if (!token || typeof token !== 'string') return null;
+  try {
+    const decoded = Buffer.from(token.trim(), 'base64url').toString('utf-8');
+    const sepIdx = decoded.lastIndexOf('|');
+    if (sepIdx <= 0) return null;
+    const userId = decoded.slice(0, sepIdx);
+    const sig = decoded.slice(sepIdx + 1);
+    if (!userId || !sig || !/^[0-9a-f]{64}$/i.test(sig)) return null;
+    const expectedSig = crypto
+      .createHmac('sha256', SERVER_HMAC_SECRET)
+      .update(`cal|${userId}`)
+      .digest('hex');
+    const bufA = Buffer.from(sig, 'hex');
+    const bufB = Buffer.from(expectedSig, 'hex');
+    if (bufA.length !== bufB.length) return null;
+    return crypto.timingSafeEqual(bufA, bufB) ? userId : null;
+  } catch {
+    return null;
+  }
+}
+
+function formatServerIcsDateTime(dateStr, timeStr, addMinutes = 0) {
+  const [y, m, d] = String(dateStr || '2026-01-01')
+    .split('-')
+    .map((n) => Number(n) || 1);
+  const [hh, mm] = String(timeStr || '09:00')
+    .split(':')
+    .map((n) => Number(n) || 0);
+  const dt = new Date(Date.UTC(y, m - 1, d, hh, mm + addMinutes, 0));
+  const pad = (n) => String(n).padStart(2, '0');
+  return `${dt.getUTCFullYear()}${pad(dt.getUTCMonth() + 1)}${pad(dt.getUTCDate())}T${pad(
+    dt.getUTCHours(),
+  )}${pad(dt.getUTCMinutes())}00`;
+}
+
+function escapeServerIcsText(value) {
+  return String(value || '')
+    .replace(/\\/g, '\\\\')
+    .replace(/;/g, '\\;')
+    .replace(/,/g, '\\,')
+    .replace(/\r?\n/g, '\\n');
+}
+
+function buildServerIcsFeed(tasks, userName = 'BVS Special') {
+  const stamp = formatServerIcsDateTime(new Date().toISOString().slice(0, 10), '09:00', 0);
+  const scopeLabels = {
+    work: 'Trabalho',
+    personal: 'Pessoal',
+    study: 'Estudo',
+  };
+  const activeTasks = (Array.isArray(tasks) ? tasks : []).filter((t) => !t.isCompleted);
+
+  const events = activeTasks
+    .map((task) => {
+      const dtStart = formatServerIcsDateTime(task.date, task.time, 0);
+      const dtEnd = formatServerIcsDateTime(task.date, task.time, 60);
+      const scopeLabel = scopeLabels[task.scope] || 'Trabalho';
+      const summary = escapeServerIcsText(`[BVS Special • ${scopeLabel}] ${task.title}`);
+      const description = escapeServerIcsText(
+        task.description
+          ? `${task.description} (Prioridade: ${task.priority})`
+          : `Tarefa BVS Special — Categoria: ${scopeLabel}`,
+      );
+      return [
+        'BEGIN:VEVENT',
+        `UID:bvs-special-${task.id}@bvtasks.app`,
+        `DTSTAMP:${stamp}Z`,
+        `DTSTART:${dtStart}`,
+        `DTEND:${dtEnd}`,
+        `SUMMARY:${summary}`,
+        `DESCRIPTION:${description}`,
+        'STATUS:CONFIRMED',
+        'BEGIN:VALARM',
+        'TRIGGER:-PT15M',
+        'ACTION:DISPLAY',
+        `DESCRIPTION:Lembrete BVS Special: ${summary}`,
+        'END:VALARM',
+        'END:VEVENT',
+      ].join('\r\n');
+    })
+    .join('\r\n');
+
+  const lines = [
+    'BEGIN:VCALENDAR',
+    'VERSION:2.0',
+    'PRODID:-//BVS Special//Calendario Webcal iOS//PT-BR',
+    'CALSCALE:GREGORIAN',
+    'METHOD:PUBLISH',
+    `X-WR-CALNAME:${escapeServerIcsText(`BVS Special • ${userName}`)}`,
+    'X-PUBLISHED-TTL:PT1H',
+    'REFRESH-INTERVAL;VALUE=DURATION:PT1H',
+  ];
+  if (events) lines.push(events);
+  lines.push('END:VCALENDAR');
+  return lines.join('\r\n');
 }
 
 function createSignedResetToken(email) {
@@ -489,6 +595,84 @@ const repo = {
     saveLocalDb(db);
   },
 
+  async upsertTasksBulk(userId, tasks) {
+    if (!Array.isArray(tasks) || tasks.length === 0) return [];
+
+    if (usePostgres) {
+      const client = await pgPool.connect();
+      try {
+        await client.query('BEGIN');
+        for (const task of tasks) {
+          const createdAt = task.createdAt || new Date().toISOString();
+          await client.query(
+            `INSERT INTO bv_tasks (
+              id, user_id, title, description, date, time, priority, scope, folder_id, attachments, is_completed, notified, created_at, updated_at
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10::jsonb, $11, $12, $13, NOW())
+            ON CONFLICT (user_id, id) DO UPDATE SET
+              title = EXCLUDED.title,
+              description = EXCLUDED.description,
+              date = EXCLUDED.date,
+              time = EXCLUDED.time,
+              priority = EXCLUDED.priority,
+              scope = EXCLUDED.scope,
+              folder_id = EXCLUDED.folder_id,
+              attachments = EXCLUDED.attachments,
+              is_completed = EXCLUDED.is_completed,
+              notified = EXCLUDED.notified,
+              updated_at = NOW()`,
+            [
+              task.id,
+              userId,
+              task.title,
+              task.description || null,
+              task.date,
+              task.time || null,
+              task.priority || 'medium',
+              task.scope || 'work',
+              task.folderId || null,
+              JSON.stringify(Array.isArray(task.attachments) ? task.attachments : []),
+              Boolean(task.isCompleted),
+              Boolean(task.notified),
+              createdAt,
+            ],
+          );
+        }
+        await client.query('COMMIT');
+        return tasks;
+      } catch (err) {
+        await client.query('ROLLBACK');
+        throw err;
+      } finally {
+        client.release();
+      }
+    }
+
+    const db = readLocalDb();
+    for (const task of tasks) {
+      const createdAt = task.createdAt || new Date().toISOString();
+      const idx = db.tasks.findIndex((t) => t.user_id === userId && t.id === task.id);
+      const record = {
+        id: task.id,
+        user_id: userId,
+        title: task.title,
+        description: task.description || null,
+        date: task.date,
+        time: task.time || null,
+        priority: task.priority || 'medium',
+        scope: task.scope || 'work',
+        folder_id: task.folderId || null,
+        attachments: Array.isArray(task.attachments) ? task.attachments : [],
+        is_completed: Boolean(task.isCompleted),
+        notified: Boolean(task.notified),
+        created_at: createdAt,
+      };
+      if (idx >= 0) db.tasks[idx] = record;
+      else db.tasks.push(record);
+    }
+    saveLocalDb(db);
+    return tasks;
+  },
+
   async deleteTask(userId, taskId) {
     if (usePostgres) {
       await pgPool.query('DELETE FROM bv_tasks WHERE user_id = $1 AND id = $2', [
@@ -648,12 +832,387 @@ function getClientIp(req) {
   return req.socket?.remoteAddress || 'unknown';
 }
 
-async function handleApiRequest(req, res, pathname) {
+function isValidIsoDate(dateStr) {
+  if (typeof dateStr !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) return false;
+  const [y, m, d] = dateStr.split('-').map(Number);
+  const dt = new Date(Date.UTC(y, m - 1, d));
+  return (
+    dt.getUTCFullYear() === y &&
+    dt.getUTCMonth() === m - 1 &&
+    dt.getUTCDate() === d
+  );
+}
+
+function normalizeScopeValue(raw) {
+  const v = String(raw || 'work').trim().toLowerCase();
+  if (v === 'personal' || v === 'pessoal') return 'personal';
+  if (v === 'study' || v === 'estudo' || v === 'estudos') return 'study';
+  return 'work';
+}
+
+function normalizePriorityValue(raw) {
+  const v = String(raw || 'medium').trim().toLowerCase();
+  if (v === 'high' || v === 'alta' || v === 'urgente') return 'high';
+  if (v === 'low' || v === 'baixa') return 'low';
+  return 'medium';
+}
+
+function normalizeBulkTaskPayload(rawTask) {
+  if (!rawTask || typeof rawTask !== 'object') {
+    return { error: 'Objeto de tarefa inválido.' };
+  }
+  const title = String(rawTask.title || '').trim().slice(0, 240);
+  const date = String(rawTask.date || '').trim();
+  if (!title) {
+    return { error: 'Toda tarefa precisa de um título.' };
+  }
+  if (!isValidIsoDate(date)) {
+    return { error: `Data inválida na tarefa "${title}": use o formato YYYY-MM-DD.` };
+  }
+  const rawTime = rawTask.time ? String(rawTask.time).trim() : '';
+  const validTime = /^([01]\d|2[0-3]):[0-5]\d$/.test(rawTime) ? rawTime : undefined;
+  const description = rawTask.description
+    ? String(rawTask.description).trim().slice(0, 1200)
+    : undefined;
+
+  return {
+    task: {
+      id: String(rawTask.id || '').trim() || `tsk_${crypto.randomUUID()}`,
+      title,
+      ...(description ? { description } : {}),
+      date,
+      ...(validTime ? { time: validTime } : {}),
+      priority: normalizePriorityValue(rawTask.priority),
+      scope: normalizeScopeValue(rawTask.scope),
+      ...(rawTask.folderId ? { folderId: String(rawTask.folderId).trim() } : {}),
+      attachments: Array.isArray(rawTask.attachments) ? rawTask.attachments.slice(0, 10) : [],
+      isCompleted: Boolean(rawTask.isCompleted),
+      notified: Boolean(rawTask.notified),
+      createdAt:
+        typeof rawTask.createdAt === 'string' && rawTask.createdAt
+          ? rawTask.createdAt
+          : new Date().toISOString(),
+    },
+  };
+}
+
+function getNextMonthKey(monthKey) {
+  const [yStr, mStr] = monthKey.split('-');
+  const y = Number(yStr);
+  const m = Number(mStr);
+  if (m === 12) return `${y + 1}-01`;
+  return `${y}-${String(m + 1).padStart(2, '0')}`;
+}
+
+export function computeMonthlyReviewData(allTasks, monthKey) {
+  const monthTasks = (Array.isArray(allTasks) ? allTasks : []).filter(
+    (t) => typeof t.date === 'string' && t.date.startsWith(monthKey),
+  );
+  const completedTasks = monthTasks.filter((t) => Boolean(t.isCompleted));
+  const pendingTasks = monthTasks.filter((t) => !t.isCompleted);
+
+  const scopeLabels = {
+    work: 'Trabalho',
+    personal: 'Pessoal',
+    study: 'Estudo',
+  };
+
+  const byScope = {
+    work: { total: 0, completed: 0, pending: 0 },
+    personal: { total: 0, completed: 0, pending: 0 },
+    study: { total: 0, completed: 0, pending: 0 },
+  };
+
+  for (const task of monthTasks) {
+    const scope = normalizeScopeValue(task.scope);
+    byScope[scope].total += 1;
+    if (task.isCompleted) byScope[scope].completed += 1;
+    else byScope[scope].pending += 1;
+  }
+
+  let bottleneckScope = null;
+  let maxPendingInScope = 0;
+  for (const [scopeKey, counts] of Object.entries(byScope)) {
+    if (counts.pending > maxPendingInScope) {
+      maxPendingInScope = counts.pending;
+      bottleneckScope = scopeLabels[scopeKey] || scopeKey;
+    }
+  }
+
+  const total = monthTasks.length;
+  const completed = completedTasks.length;
+  const pending = pendingTasks.length;
+  const completionRate = total > 0 ? Math.round((completed / total) * 100) : 0;
+  const highPriorityPending = pendingTasks.filter((t) => t.priority === 'high').length;
+
+  const summaryForAi = pendingTasks.slice(0, 40).map((t) => ({
+    title: t.title,
+    date: t.date,
+    time: t.time || null,
+    priority: t.priority,
+    scope: t.scope,
+    description: t.description ? String(t.description).slice(0, 140) : null,
+  }));
+
+  return {
+    stats: {
+      month: monthKey,
+      total,
+      completed,
+      pending,
+      completionRate,
+      highPriorityPending,
+      bottleneckScope,
+      byScope,
+    },
+    pendingTasks,
+    summaryForAi,
+  };
+}
+
+async function runGeminiMonthlyReview({ month, nextMonth, stats, pendingSummary, geminiGenerateFn }) {
+  const prompt = [
+    'Você é um Consultor Executivo de Produtividade do aplicativo BVS Special.',
+    `Analise o fechamento do mês ${month} para planejamento do próximo mês ${nextMonth}.`,
+    'Responda EXCLUSIVAMENTE em Português do Brasil em JSON válido seguindo o esquema solicitado.',
+    'Dados consolidados (somente resumo estatístico e pendências):',
+    JSON.stringify({
+      mesAnalisado: month,
+      proximoMes: nextMonth,
+      estatisticas: stats,
+      tarefasPendentes: pendingSummary,
+    }),
+    'Regras obrigatórias:',
+    '1. diagnostico: escreva um resumo executivo direto (2 a 4 frases) avaliando a taxa de conclusão, o gargalo principal e prioridades.',
+    '2. proximosPassos: exatamente 3 ações práticas e objetivas para destravar produtividade no próximo mês.',
+    `3. tarefasSugeridasProximoMes: entre 2 e 5 tarefas estruturadas e acionáveis com datas dentro de ${nextMonth} (YYYY-MM-DD), priority ("high" | "medium" | "low") e scope ("work" | "personal" | "study").`,
+  ].join('\n');
+
+  let rawText = '';
+  if (typeof geminiGenerateFn === 'function') {
+    rawText = await geminiGenerateFn({
+      model: 'gemini-2.5-flash',
+      prompt,
+      month,
+      nextMonth,
+      stats,
+      pendingSummary,
+    });
+  } else {
+    const apiKey = (process.env.GEMINI_API_KEY || '').trim();
+    const ai = new GoogleGenAI({ apiKey });
+    const response = await ai.models.generateContent({
+      model: 'gemini-2.5-flash',
+      contents: prompt,
+      config: {
+        responseMimeType: 'application/json',
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            diagnostico: { type: Type.STRING },
+            proximosPassos: {
+              type: Type.ARRAY,
+              items: { type: Type.STRING },
+            },
+            tarefasSugeridasProximoMes: {
+              type: Type.ARRAY,
+              items: {
+                type: Type.OBJECT,
+                properties: {
+                  title: { type: Type.STRING },
+                  description: { type: Type.STRING },
+                  date: { type: Type.STRING },
+                  time: { type: Type.STRING },
+                  priority: { type: Type.STRING },
+                  scope: { type: Type.STRING },
+                },
+                required: ['title', 'date', 'priority', 'scope'],
+              },
+            },
+          },
+          required: ['diagnostico', 'proximosPassos', 'tarefasSugeridasProximoMes'],
+        },
+      },
+    });
+    rawText = response?.text || '{}';
+  }
+
+  const parsed = typeof rawText === 'string' ? JSON.parse(rawText) : rawText;
+  const diagnostico =
+    String(parsed?.diagnostico || '').trim() ||
+    `Mês ${month}: ${stats.completed} de ${stats.total} tarefas concluídas (${stats.completionRate}%).`;
+
+  const stepsRaw = Array.isArray(parsed?.proximosPassos)
+    ? parsed.proximosPassos.map((s) => String(s || '').trim()).filter(Boolean)
+    : [];
+  while (stepsRaw.length < 3) {
+    stepsRaw.push(
+      stepsRaw.length === 0
+        ? 'Priorizar tarefas de alta criticidade no início da manhã.'
+        : stepsRaw.length === 1
+          ? 'Agrupar demandas da categoria com maior gargalo em blocos de foco.'
+          : 'Revisar pendências migradas semanalmente na Visão Global.',
+    );
+  }
+  const proximosPassos = stepsRaw.slice(0, 3);
+
+  const fallbackDay = (idx) => `${nextMonth}-${String(Math.min(28, 3 + idx * 5)).padStart(2, '0')}`;
+  const suggestedRaw = Array.isArray(parsed?.tarefasSugeridasProximoMes)
+    ? parsed.tarefasSugeridasProximoMes
+    : [];
+  const tarefasSugeridasProximoMes = suggestedRaw
+    .slice(0, 8)
+    .map((item, idx) => {
+      const candidateDate = String(item?.date || '').trim();
+      const safeDate =
+        isValidIsoDate(candidateDate) && candidateDate.startsWith(nextMonth)
+          ? candidateDate
+          : fallbackDay(idx);
+      const rawTime = String(item?.time || '').trim();
+      const safeTime = /^([01]\d|2[0-3]):[0-5]\d$/.test(rawTime) ? rawTime : undefined;
+      return {
+        title: String(item?.title || `Planejamento Executivo #${idx + 1}`).trim().slice(0, 200),
+        description: String(item?.description || '').trim().slice(0, 600),
+        date: safeDate,
+        ...(safeTime ? { time: safeTime } : {}),
+        priority: normalizePriorityValue(item?.priority),
+        scope: normalizeScopeValue(item?.scope),
+      };
+    })
+    .filter((t) => Boolean(t.title));
+
+  return {
+    diagnostico,
+    proximosPassos,
+    tarefasSugeridasProximoMes,
+  };
+}
+
+async function runGeminiTaskAssistant({
+  message,
+  currentDate,
+  history,
+  geminiAssistantFn,
+}) {
+  const safeCurrentDate = isValidIsoDate(currentDate)
+    ? currentDate
+    : new Date().toISOString().slice(0, 10);
+
+  const safeHistory = (Array.isArray(history) ? history : [])
+    .slice(-6)
+    .map((entry) => {
+      const role = entry?.role === 'assistant' ? 'Assistente' : 'Usuário';
+      const text = String(entry?.text || '').trim().slice(0, 400);
+      return text ? `${role}: ${text}` : '';
+    })
+    .filter(Boolean)
+    .join('\n');
+
+  const systemPrompt = [
+    'Você é o Assistente Executivo de Ação Rápida do aplicativo B V Tasks (BVS Special).',
+    'ESCOPO EXCLUSIVO: Você deve responder EXCLUSIVAMENTE sobre gestão de tarefas, produtividade, criação de cronogramas, divisão de metas em subtarefas e organização de horários.',
+    'Se a mensagem do usuário fugir de tarefas/produtividade/organização pessoal ou profissional, recuse educadamente em 1 frase curta em "reply" e retorne "suggestedTasks": [].',
+    `Data atual de referência: ${safeCurrentDate}.`,
+    'Retorne SEMPRE um JSON válido com:',
+    '- "reply": resposta curta, direta e cordial em português brasileiro.',
+    '- "suggestedTasks": lista de tarefas acionáveis (vazia se nenhuma tarefa precisar ser criada), cada uma com "title", "description", "date" (YYYY-MM-DD), "time" (HH:MM opcional), "category" ("Trabalho", "Pessoal" ou "Estudo") e "priority" ("Alta", "Média" ou "Baixa").',
+  ].join('\n');
+
+  const fullPrompt = safeHistory
+    ? `Histórico recente:\n${safeHistory}\n\nPedido atual do usuário: ${message}`
+    : `Pedido do usuário: ${message}`;
+
+  let rawText;
+  if (typeof geminiAssistantFn === 'function') {
+    rawText = await geminiAssistantFn({
+      message,
+      currentDate: safeCurrentDate,
+      history: safeHistory,
+      systemPrompt,
+      fullPrompt,
+    });
+  } else {
+    const apiKey = (process.env.GEMINI_API_KEY || '').trim();
+    const ai = new GoogleGenAI({ apiKey });
+    const response = await ai.models.generateContent({
+      model: 'gemini-2.5-flash',
+      contents: fullPrompt,
+      config: {
+        systemInstruction: systemPrompt,
+        responseMimeType: 'application/json',
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            reply: { type: Type.STRING },
+            suggestedTasks: {
+              type: Type.ARRAY,
+              items: {
+                type: Type.OBJECT,
+                properties: {
+                  title: { type: Type.STRING },
+                  description: { type: Type.STRING },
+                  date: { type: Type.STRING },
+                  time: { type: Type.STRING },
+                  category: { type: Type.STRING },
+                  priority: { type: Type.STRING },
+                },
+                required: ['title', 'date', 'category', 'priority'],
+              },
+            },
+          },
+          required: ['reply', 'suggestedTasks'],
+        },
+      },
+    });
+    rawText = response?.text || '{}';
+  }
+
+  const parsed = typeof rawText === 'string' ? JSON.parse(rawText) : rawText;
+  const reply =
+    String(parsed?.reply || '').trim() ||
+    'Aqui está a sugestão estruturada para o seu cronograma BVS Special.';
+
+  const scopeToCategoryLabel = {
+    work: 'Trabalho',
+    personal: 'Pessoal',
+    study: 'Estudo',
+  };
+
+  const rawSuggested = Array.isArray(parsed?.suggestedTasks) ? parsed.suggestedTasks : [];
+  const suggestedTasks = rawSuggested
+    .slice(0, 12)
+    .map((item, idx) => {
+      const candidateDate = String(item?.date || '').trim();
+      const safeDate = isValidIsoDate(candidateDate) ? candidateDate : safeCurrentDate;
+      const rawTime = String(item?.time || '').trim();
+      const safeTime = /^([01]\d|2[0-3]):[0-5]\d$/.test(rawTime) ? rawTime : undefined;
+      const scope = normalizeScopeValue(item?.category || item?.scope);
+      const priority = normalizePriorityValue(item?.priority);
+      return {
+        title: String(item?.title || `Tarefa Sugerida #${idx + 1}`).trim().slice(0, 200),
+        description: String(item?.description || '').trim().slice(0, 600),
+        date: safeDate,
+        ...(safeTime ? { time: safeTime } : {}),
+        category: scopeToCategoryLabel[scope] || 'Trabalho',
+        scope,
+        priority,
+      };
+    })
+    .filter((t) => Boolean(t.title));
+
+  return {
+    reply,
+    suggestedTasks,
+  };
+}
+
+async function handleApiRequest(req, res, pathname, serverOptions = {}) {
   const method = (req.method || 'GET').toUpperCase();
   const clientIp = getClientIp(req);
 
   // 1. Healthcheck e diagnóstico de persistência SQL
   if (method === 'GET' && pathname === '/api/health') {
+    const aiEnabled = Boolean((process.env.GEMINI_API_KEY || '').trim() || serverOptions.geminiGenerateFn);
     if (usePostgres) {
       try {
         await pgPool.query('SELECT 1');
@@ -662,7 +1221,8 @@ async function handleApiRequest(req, res, pathname) {
           status: 'ok',
           engine: 'postgresql',
           sqlPersistent: true,
-          version: 'bv-tasks-v8',
+          aiEnabled,
+          version: 'bv-tasks-v12',
           time: new Date().toISOString(),
         });
       } catch (err) {
@@ -671,6 +1231,7 @@ async function handleApiRequest(req, res, pathname) {
           status: 'db_error',
           engine: 'postgresql',
           sqlPersistent: false,
+          aiEnabled,
           error: 'Falha ao conectar no PostgreSQL: ' + (err?.message || 'erro desconhecido'),
         });
       }
@@ -680,7 +1241,8 @@ async function handleApiRequest(req, res, pathname) {
       status: 'ok',
       engine: 'local-file',
       sqlPersistent: false,
-      version: 'bv-tasks-v8',
+      aiEnabled,
+      version: 'bv-tasks-v12',
       time: new Date().toISOString(),
     });
   }
@@ -971,6 +1533,46 @@ async function handleApiRequest(req, res, pathname) {
     return sendJson(res, 200, { ok: true });
   }
 
+  // 8. Feed de Assinatura Automática iOS / Apple Calendar (GET /api/calendar/feed/:userToken.ics)
+  if (
+    method === 'GET' &&
+    pathname.startsWith('/api/calendar/feed/') &&
+    pathname.endsWith('.ics')
+  ) {
+    const rawSegment = pathname
+      .slice('/api/calendar/feed/'.length, -'.ics'.length)
+      .trim();
+    if (!rawSegment) {
+      return sendJson(res, 401, { ok: false, error: 'Token do calendário ausente.' });
+    }
+
+    let feedUserId = verifyCalendarFeedToken(rawSegment);
+    if (!feedUserId) {
+      feedUserId = await repo.getUserIdByToken(rawSegment);
+    }
+
+    if (!feedUserId) {
+      return sendJson(res, 401, { ok: false, error: 'Token do feed de calendário inválido.' });
+    }
+
+    const [feedUser, feedData] = await Promise.all([
+      repo.findUserById(feedUserId),
+      repo.getUserData(feedUserId),
+    ]);
+    if (!feedUser) {
+      return sendJson(res, 404, { ok: false, error: 'Usuário do calendário não encontrado.' });
+    }
+
+    const icsPayload = buildServerIcsFeed(feedData.tasks, feedUser.name);
+    res.writeHead(200, {
+      'Content-Type': 'text/calendar; charset=utf-8',
+      'Content-Disposition': 'inline; filename="cronograma-bv.ics"',
+      'Cache-Control': 'no-cache, no-store, must-revalidate',
+    });
+    res.end(icsPayload);
+    return;
+  }
+
   // ==========================================================================
   // Rotas Autenticadas de Tarefas e Pastas (Isoladas por user_id no SQL)
   // ==========================================================================
@@ -981,6 +1583,16 @@ async function handleApiRequest(req, res, pathname) {
     return sendJson(res, 401, {
       ok: false,
       error: 'Sessão expirada ou não autenticada. Faça login novamente.',
+    });
+  }
+
+  // GET /api/calendar/feed-token -> Gera link assinado seguro para assinatura webcal:// no iOS
+  if (method === 'GET' && pathname === '/api/calendar/feed-token') {
+    const feedToken = createCalendarFeedToken(userId);
+    return sendJson(res, 200, {
+      ok: true,
+      feedToken,
+      feedPath: `/api/calendar/feed/${feedToken}.ics`,
     });
   }
 
@@ -1030,6 +1642,176 @@ async function handleApiRequest(req, res, pathname) {
     }
     await repo.upsertTask(userId, task);
     return sendJson(res, 200, { ok: true });
+  }
+
+  // POST /api/tasks/bulk -> Inserção/Atualização em lote em uma única transação SQL
+  if (method === 'POST' && pathname === '/api/tasks/bulk') {
+    try {
+      const body = await parseJsonBody(req);
+      const rawList = Array.isArray(body?.tasks) ? body.tasks : null;
+      if (!rawList || rawList.length === 0) {
+        return sendJson(res, 400, {
+          ok: false,
+          error: 'Envie uma lista não vazia em "tasks" para importação em lote.',
+        });
+      }
+      if (rawList.length > 1000) {
+        return sendJson(res, 400, {
+          ok: false,
+          error: 'O limite por importação em lote é de 1.000 tarefas por vez.',
+        });
+      }
+
+      const validTasks = [];
+      const errors = [];
+      rawList.forEach((item, index) => {
+        const resNorm = normalizeBulkTaskPayload(item);
+        if (resNorm.error || !resNorm.task) {
+          errors.push(`Linha ${index + 1}: ${resNorm.error || 'Dados inválidos'}`);
+        } else {
+          validTasks.push(resNorm.task);
+        }
+      });
+
+      if (errors.length > 0) {
+        return sendJson(res, 400, {
+          ok: false,
+          error: errors[0],
+          errors: errors.slice(0, 10),
+        });
+      }
+
+      const insertedTasks = await repo.upsertTasksBulk(userId, validTasks);
+      const userData = await repo.getUserData(userId);
+      return sendJson(res, 201, {
+        ok: true,
+        insertedCount: insertedTasks.length,
+        insertedTasks,
+        tasks: userData.tasks,
+      });
+    } catch (err) {
+      console.error('[Bulk Tasks Error]', err);
+      return sendJson(res, 500, {
+        ok: false,
+        error: 'Erro interno na transação em lote das tarefas.',
+      });
+    }
+  }
+
+  // POST /api/ai/monthly-review -> Fechamento inteligente do mês com Google Gemini 2.5 Flash
+  if (method === 'POST' && pathname === '/api/ai/monthly-review') {
+    try {
+      const body = await parseJsonBody(req);
+      const now = new Date();
+      const defaultMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+      const requestedMonth = String(body?.month || defaultMonth).trim();
+
+      if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(requestedMonth)) {
+        return sendJson(res, 400, {
+          ok: false,
+          error: 'Mês inválido. Use o formato YYYY-MM (ex.: 2026-11).',
+        });
+      }
+
+      const nextMonth = getNextMonthKey(requestedMonth);
+      const userData = await repo.getUserData(userId);
+      const { stats, pendingTasks, summaryForAi } = computeMonthlyReviewData(
+        userData.tasks,
+        requestedMonth,
+      );
+
+      const hasApiKey = Boolean((process.env.GEMINI_API_KEY || '').trim());
+      if (!hasApiKey && typeof serverOptions.geminiGenerateFn !== 'function') {
+        return sendJson(res, 503, {
+          ok: false,
+          missingApiKey: true,
+          month: requestedMonth,
+          nextMonth,
+          stats,
+          pendingTasksCount: pendingTasks.length,
+          error:
+            'Chave da API do Gemini (GEMINI_API_KEY) não configurada no servidor. Adicione GEMINI_API_KEY nas variáveis de ambiente do Render ou .env.',
+        });
+      }
+
+      const review = await runGeminiMonthlyReview({
+        month: requestedMonth,
+        nextMonth,
+        stats,
+        pendingSummary: summaryForAi,
+        geminiGenerateFn: serverOptions.geminiGenerateFn,
+      });
+
+      return sendJson(res, 200, {
+        ok: true,
+        month: requestedMonth,
+        nextMonth,
+        stats,
+        pendingTasksCount: pendingTasks.length,
+        pendingTaskIds: pendingTasks.map((t) => t.id),
+        review,
+      });
+    } catch (err) {
+      console.error('[AI Monthly Review Error]', err);
+      return sendJson(res, 500, {
+        ok: false,
+        error: 'Erro ao consultar o Gemini para o fechamento mensal. Tente novamente.',
+      });
+    }
+  }
+
+  // POST /api/ai/assistant -> Mini-Chatbot Assistente de Ação Rápida (Exclusivo para Tarefas)
+  if (method === 'POST' && pathname === '/api/ai/assistant') {
+    try {
+      const body = await parseJsonBody(req);
+      const message = String(body?.message || '').trim();
+      if (!message) {
+        return sendJson(res, 400, {
+          ok: false,
+          error: 'Digite uma mensagem ou meta para o Assistente de Tarefas.',
+        });
+      }
+      if (message.length > 1500) {
+        return sendJson(res, 400, {
+          ok: false,
+          error: 'Mensagem muito longa (máximo de 1.500 caracteres).',
+        });
+      }
+
+      const currentDate = String(
+        body?.currentDate || new Date().toISOString().slice(0, 10),
+      ).trim();
+      const history = Array.isArray(body?.history) ? body.history : [];
+
+      const hasApiKey = Boolean((process.env.GEMINI_API_KEY || '').trim());
+      if (!hasApiKey && typeof serverOptions.geminiAssistantFn !== 'function') {
+        return sendJson(res, 503, {
+          ok: false,
+          missingApiKey: true,
+          error:
+            'Chave da API do Gemini (GEMINI_API_KEY) não configurada no servidor. Adicione GEMINI_API_KEY no Render ou no arquivo .env.',
+        });
+      }
+
+      const assistantResult = await runGeminiTaskAssistant({
+        message,
+        currentDate,
+        history,
+        geminiAssistantFn: serverOptions.geminiAssistantFn,
+      });
+
+      return sendJson(res, 200, {
+        ok: true,
+        reply: assistantResult.reply,
+        suggestedTasks: assistantResult.suggestedTasks,
+      });
+    } catch (err) {
+      console.error('[AI Assistant Error]', err);
+      return sendJson(res, 500, {
+        ok: false,
+        error: 'Erro ao consultar o Assistente IA de tarefas. Tente novamente.',
+      });
+    }
   }
 
   // DELETE /api/tasks/:id -> Exclui uma tarefa individual no SQL (reflete em todos os aparelhos)
@@ -1092,7 +1874,7 @@ const SECURITY_HEADERS = {
   'Permissions-Policy': 'camera=(self), microphone=(), geolocation=()',
 };
 
-export function createAppServer() {
+export function createAppServer(serverOptions = {}) {
   return http.createServer(async (req, res) => {
     for (const [name, value] of Object.entries(SECURITY_HEADERS)) {
       res.setHeader(name, value);
@@ -1124,7 +1906,7 @@ export function createAppServer() {
       }
 
       if (decodedPathname.startsWith('/api/')) {
-        return await handleApiRequest(req, res, decodedPathname);
+        return await handleApiRequest(req, res, decodedPathname, serverOptions);
       }
 
       let filePath = path.resolve(distDir, '.' + path.posix.normalize('/' + decodedPathname));
@@ -1141,7 +1923,7 @@ export function createAppServer() {
       if (fs.existsSync(filePath) && fs.statSync(filePath).isFile()) {
         const ext = path.extname(filePath).toLowerCase();
         const contentType =
-          parsedUrl.pathname === '/manifest.json'
+          parsedUrl.pathname === '/manifest.json' || parsedUrl.pathname === '/manifest.webmanifest'
             ? 'application/manifest+json; charset=utf-8'
             : MIME_TYPES[ext] || 'application/octet-stream';
 

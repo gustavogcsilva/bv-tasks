@@ -27,22 +27,23 @@
     <meta name="theme-color" content="#7F1D1D" media="(prefers-color-scheme: light)" />
     <meta name="theme-color" content="#09090B" media="(prefers-color-scheme: dark)" />
     <meta name="mobile-web-app-capable" content="yes" />
-    <link rel="manifest" href="/manifest.json" />
+    <link rel="manifest" href="/manifest.webmanifest" />
 
-    <!-- iOS Web App Meta Tags (iPhone Safari Standalone) -->
+    <!-- iOS Web App Meta Tags (iPhone Safari Standalone + Shortcuts) -->
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-    <meta name="apple-mobile-web-app-title" content="BVS Special" />
+    <meta name="apple-mobile-web-app-title" content="B V Tasks" />
     <meta name="format-detection" content="telephone=no" />
 
     <!-- Ícones para iOS, Android e Navegadores -->
     <link rel="icon" type="image/svg+xml" href="/icon.svg" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
 
     <!-- Script de Autocura e Proteção contra Tela Branca / Cache Legado -->
     <script>
       (function() {
-        var APP_VERSION = 'bv-tasks-v11';
+        var APP_VERSION = 'bv-tasks-v12';
         try {
           var storedVersion = localStorage.getItem('__bv_tasks_cache_version__');
           if (storedVersion !== APP_VERSION) {

@@ -1,16 +1,24 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { format, isSameDay, isValid, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { IosInstallBanner } from './components/IosInstallBanner';
 import { LeftMenuBar } from './components/LeftMenuBar';
+import { MobileBottomNav, type WorkspaceTab } from './components/MobileBottomNav';
 import { Button } from './components/ui/Button';
 import { Logo } from './components/ui/Logo';
+import { TaskAssistantChat } from './features/ai-assistant/components/TaskAssistantChat';
+import { MonthlyReviewModal } from './features/ai-review/components/MonthlyReviewModal';
 import { AuthScreen } from './features/auth/components/AuthScreen';
 import { CalendarStrip } from './features/calendar/components/CalendarStrip';
 import { FolderManager } from './features/folders/components/FolderManager';
+import { BulkImportModal } from './features/import/components/BulkImportModal';
+import { GlobalTasksOverview } from './features/tasks/components/GlobalTasksOverview';
 import { TaskItem } from './features/tasks/components/TaskItem';
 import { TaskModal } from './features/tasks/components/TaskModal';
 import { SCOPE_CONFIG, type Task, type TaskDraft } from './features/tasks/types/task.types';
 import { useOnlineStatus } from './pwa/registerServiceWorker';
+import { apiGetCalendarFeedUrl } from './services/apiSync';
+import { copyTextToClipboard } from './services/bulkImport';
 import {
   exportTasksToPdf,
   getNotificationPermission,
@@ -20,6 +28,29 @@ import {
 } from './services/notificationsAndCalendar';
 import { sortTasks, useTaskStore } from './stores/useTaskStore';
 
+export type AppDeepAction = 'new-task' | 'import' | 'chat' | 'ai-review' | null;
+
+export function parseAppDeepLink(search: string): {
+  action: AppDeepAction;
+  filterToday: boolean;
+} {
+  const params = new URLSearchParams(search || '');
+  const rawAction = (params.get('action') || '').trim().toLowerCase();
+  const rawFilter = (params.get('filter') || '').trim().toLowerCase();
+
+  const action: AppDeepAction =
+    rawAction === 'new-task' ||
+    rawAction === 'import' ||
+    rawAction === 'chat' ||
+    rawAction === 'ai-review'
+      ? rawAction
+      : null;
+
+  const filterToday = rawFilter === 'today' || rawFilter === 'hoje';
+
+  return { action, filterToday };
+}
+
 interface ToastState {
   id: number;
   message: string;
@@ -27,9 +58,17 @@ interface ToastState {
 }
 
 export function BVTasksApp() {
+  const [activeTab, setActiveTab] = useState<WorkspaceTab>('global');
+  const [filterTodayOnly, setFilterTodayOnly] = useState(false);
   const [isModalVisible, setIsModalVisible] = useState(false);
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
+  const [isAiReviewModalOpen, setIsAiReviewModalOpen] = useState(false);
+  const [isAssistantOpen, setIsAssistantOpen] = useState(false);
   const [notifPermission, setNotifPermission] = useState(() => getNotificationPermission());
   const isOnline = useOnlineStatus();
+  const pendingDeepLinkRef = useRef<{ action: AppDeepAction; filterToday: boolean } | null>(
+    typeof window !== 'undefined' ? parseAppDeepLink(window.location.search) : null,
+  );
 
   // Estados de feedback, menu mobile e sincronização
   const [recentlyCreatedTaskId, setRecentlyCreatedTaskId] = useState<string | null>(null);
@@ -47,6 +86,7 @@ export function BVTasksApp() {
   const syncWithDatabase = useTaskStore((state) => state.syncWithDatabase);
   const clearAllUserData = useTaskStore((state) => state.clearAllUserData);
   const dbEngine = useTaskStore((state) => state.dbEngine);
+  const pendingOfflineSync = useTaskStore((state) => state.pendingOfflineSync);
 
   const tasks = useTaskStore((state) => state.tasks);
   const folders = useTaskStore((state) => state.folders);
@@ -60,6 +100,8 @@ export function BVTasksApp() {
   }, [selectedDateKey]);
 
   const addTask = useTaskStore((state) => state.addTask);
+  const addTasksBulk = useTaskStore((state) => state.addTasksBulk);
+  const upsertTasksBulk = useTaskStore((state) => state.upsertTasksBulk);
   const toggleTask = useTaskStore((state) => state.toggleTask);
   const deleteTask = useTaskStore((state) => state.deleteTask);
   const markTaskNotified = useTaskStore((state) => state.markTaskNotified);
@@ -110,6 +152,42 @@ export function BVTasksApp() {
       document.removeEventListener('visibilitychange', handleVisibilityOrFocus);
     };
   }, [currentUser, syncWithDatabase]);
+
+  // Suporte a Atalhos da Apple (Shortcuts) & Deep Links na inicialização (?action=new-task, import, ai-review, ?filter=today)
+  useEffect(() => {
+    if (!currentUser || !pendingDeepLinkRef.current) return;
+
+    const { action, filterToday } = pendingDeepLinkRef.current;
+    if (!action && !filterToday) {
+      pendingDeepLinkRef.current = null;
+      return;
+    }
+
+    if (filterToday) {
+      setActiveTab('global');
+      setFilterTodayOnly(true);
+      setSelectedDate(format(new Date(), 'yyyy-MM-dd'));
+    }
+
+    if (action === 'new-task') {
+      setIsModalVisible(true);
+    } else if (action === 'import') {
+      setIsImportModalOpen(true);
+    } else if (action === 'chat') {
+      setIsAssistantOpen(true);
+    } else if (action === 'ai-review') {
+      setIsAiReviewModalOpen(true);
+    }
+
+    pendingDeepLinkRef.current = null;
+    if (typeof window !== 'undefined' && window.location.search) {
+      try {
+        window.history.replaceState({}, '', window.location.pathname + window.location.hash);
+      } catch {
+        // Ignora ambientes sem history mutável
+      }
+    }
+  }, [currentUser, setSelectedDate]);
 
   // Monitoramento de conectividade para avisos e sincronização automática
   useEffect(() => {
@@ -205,6 +283,24 @@ export function BVTasksApp() {
     showToast('📄 Arquivo PDF da agenda do dia exportado com sucesso!', 'success');
   }
 
+  async function handleCopyIosCalendarLink() {
+    const res = await apiGetCalendarFeedUrl();
+    if (!res.ok || !res.webcalUrl) {
+      showToast(
+        res.error || 'Não foi possível gerar o link webcal:// do Calendário iOS agora.',
+        'warning',
+      );
+      return;
+    }
+    const copied = await copyTextToClipboard(res.webcalUrl);
+    showToast(
+      copied
+        ? '🔗 Link de Sincronização iOS (webcal://) copiado! Assine em Ajustes > Calendário > Contas.'
+        : `🔗 Link webcal:// gerado: ${res.webcalUrl}`,
+      'success',
+    );
+  }
+
   async function handleEnableNotifications() {
     const granted = await requestNotificationPermission();
     setNotifPermission(granted ? 'granted' : getNotificationPermission());
@@ -226,7 +322,9 @@ export function BVTasksApp() {
 
   // Clicando na tarefa importante da Barra de Menu: navega diretamente para a data e rola até ela
   function handleSelectImportantTask(task: Task) {
-    // 1. Muda a data selecionada para a data da tarefa
+    // 1. Muda para a aba Agenda na data da tarefa e desliga filtro "Somente Hoje"
+    setActiveTab('agenda');
+    setFilterTodayOnly(false);
     setSelectedDate(task.date);
 
     // 2. Destrava filtros caso estejam escondendo a tarefa
@@ -355,6 +453,21 @@ export function BVTasksApp() {
                 handleExportAllPdf();
                 setIsMobileMenuOpen(false);
               }}
+              onOpenImport={() => {
+                setIsMobileMenuOpen(false);
+                setIsImportModalOpen(true);
+              }}
+              onOpenAiReview={() => {
+                setIsMobileMenuOpen(false);
+                setIsAiReviewModalOpen(true);
+              }}
+              onOpenAssistant={() => {
+                setIsMobileMenuOpen(false);
+                setIsAssistantOpen(true);
+              }}
+              onCopyIosCalendarLink={() => {
+                void handleCopyIosCalendarLink();
+              }}
             />
           </div>
         </div>
@@ -395,6 +508,27 @@ export function BVTasksApp() {
           </div>
 
           <div className="flex w-full sm:w-auto flex-wrap items-center justify-between sm:justify-end gap-2">
+            {/* Botões Desktop/Tablet: Importar Lote & Fechamento IA */}
+            <button
+              type="button"
+              onClick={() => setIsImportModalOpen(true)}
+              title="Importar planejamento em lote (Excel, CSV, JSON)"
+              className="hidden md:flex h-[40px] cursor-pointer items-center gap-1.5 rounded-xl border border-[#E6E2DA] bg-white px-3 text-[12px] font-bold text-[#0F0F12] shadow-xs transition-all hover:bg-[#FAF7F2] active:scale-95 dark:border-[#27272A] dark:bg-[#1C1C22] dark:text-[#FAFAFA]"
+            >
+              <span>📥</span>
+              <span className="font-heading">Importar</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setIsAiReviewModalOpen(true)}
+              title="Gerar Fechamento Inteligente do Mês com Google Gemini"
+              className="hidden md:flex h-[40px] cursor-pointer items-center gap-1.5 rounded-xl border border-[#E5D3D6] bg-[#FDF4F5] px-3 text-[12px] font-bold text-[#6F1D2B] shadow-xs transition-all hover:bg-[#FCE7E9] active:scale-95 dark:border-[#4C1D24] dark:bg-[#2B1217] dark:text-[#FCA5A5]"
+            >
+              <span>✨</span>
+              <span className="font-heading">IA Mês</span>
+            </button>
+
             {/* Botão Executivo de Destaque: Exportar Todas as Tarefas em PDF */}
             <button
               type="button"
@@ -455,10 +589,15 @@ export function BVTasksApp() {
           </div>
         </header>
 
-        {/* Layout Responsivo: Lado Esquerdo (Menu Bar com Login e Mini Status + Calendário + Pastas) | Lado Direito (Agenda e Tarefas) */}
+        {/* Banner Discreto para Adicionar à Tela de Início no Safari iOS */}
+        <div className="mb-4">
+          <IosInstallBanner />
+        </div>
+
+        {/* Layout Responsivo: No Mobile a Visão Geral de Tarefas vem primeiro (order-1); no Desktop fica à direita da Sidebar */}
         <main className="grid flex-1 grid-cols-1 gap-6 lg:grid-cols-[380px_1fr] xl:grid-cols-[410px_1fr]">
           {/* Coluna Esquerda: Barra de Menu & Login + Mini Status Bar + Calendário + Pastas */}
-          <aside className="flex flex-col gap-5">
+          <aside className="order-2 lg:order-1 flex flex-col gap-5">
             {/* Barra de Menu com Login e Mini Status das Tarefas Importantes */}
             <LeftMenuBar
               currentUser={currentUser}
@@ -467,11 +606,18 @@ export function BVTasksApp() {
               onSelectTask={handleSelectImportantTask}
               onSyncCalendar={() => syncTasksWithPhoneCalendar(tasks, 'bvs-special-completo.ics')}
               onExportPdf={handleExportAllPdf}
+              onOpenImport={() => setIsImportModalOpen(true)}
+              onOpenAiReview={() => setIsAiReviewModalOpen(true)}
+              onOpenAssistant={() => setIsAssistantOpen(true)}
+              onCopyIosCalendarLink={() => void handleCopyIosCalendarLink()}
             />
 
             <CalendarStrip
               selectedDate={selectedDate}
-              onSelectDate={(date) => setSelectedDate(format(date, 'yyyy-MM-dd'))}
+              onSelectDate={(date) => {
+                setSelectedDate(format(date, 'yyyy-MM-dd'));
+                setActiveTab('agenda');
+              }}
               tasks={tasks}
             />
 
@@ -485,129 +631,195 @@ export function BVTasksApp() {
             />
           </aside>
 
-          {/* Coluna Direita: Agenda do Dia, Sincronização de Calendário e Lista de Tarefas */}
+          {/* Coluna Direita: Hub Central (Visão Geral Global + Agenda do Dia) */}
           <section
-            aria-label="Agenda e Lista de tarefas"
-            className="flex flex-col rounded-3xl border border-[#E5E4E0] bg-white p-5 shadow-[0_4px_20px_rgba(15,15,18,0.04)] sm:p-6 dark:border-[#27272A] dark:bg-[#141418]"
+            aria-label="Visão Geral Global e Agenda de Tarefas"
+            className="order-1 lg:order-2 flex flex-col rounded-3xl border border-[#E5E4E0] bg-white p-4 shadow-[0_4px_20px_rgba(15,15,18,0.04)] sm:p-6 dark:border-[#27272A] dark:bg-[#141418]"
           >
-            <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
-              <div>
-                <h2 className="font-editorial text-[24px] sm:text-[28px] font-black tracking-tight text-[#0F0F12] dark:text-[#FAFAFA]">
-                  Agenda
-                </h2>
-                <p className="font-heading mt-0.5 text-[13px] font-semibold text-[#71717A] capitalize dark:text-[#A1A1AA]">
-                  {dateLabel.charAt(0).toUpperCase() + dateLabel.slice(1)}
-                </p>
-              </div>
-
-              <div className="flex flex-wrap items-center gap-2">
+            {/* Alternância Principal: Visão Geral Global vs Agenda do Dia */}
+            <div className="mb-5 flex flex-wrap items-center justify-between gap-3 border-b border-[#F1EFEA] pb-4 dark:border-[#27272A]">
+              <div
+                role="tablist"
+                aria-label="Visualização principal das tarefas"
+                className="inline-flex w-full rounded-2xl border border-[#E6E2DA] bg-[#FAF7F2] p-1 sm:w-auto dark:border-[#27272A] dark:bg-[#1C1C22]"
+              >
                 <button
                   type="button"
-                  onClick={handleExportAllPdf}
-                  title="Exportar todas as tarefas cadastradas em arquivo PDF executivo"
-                  className="font-heading cursor-pointer rounded-xl border border-[#991B1B]/40 bg-white px-3 py-1.5 text-[11px] font-bold text-[#991B1B] shadow-xs transition-colors hover:bg-[#FEF2F2] hover:border-[#991B1B] active:scale-95 dark:border-[#7F1D1D] dark:bg-[#1C1C22] dark:text-[#FCA5A5]"
+                  role="tab"
+                  aria-selected={activeTab === 'global'}
+                  onClick={() => setActiveTab('global')}
+                  className={`min-h-[44px] flex-1 cursor-pointer rounded-xl px-4 text-[13px] font-bold transition-all sm:flex-initial ${
+                    activeTab === 'global'
+                      ? 'bg-white text-[#6F1D2B] shadow-xs dark:bg-[#27272A] dark:text-[#FCA5A5]'
+                      : 'text-[#52525B] hover:text-[#0F0F12] dark:text-[#A1A1AA] dark:hover:text-white'
+                  }`}
                 >
-                  📄 Todas em PDF
+                  🗂️ Visão Geral Global
                 </button>
-                {visibleTasks.length > 0 && (
-                  <>
-                    <button
-                      type="button"
-                      onClick={handleExportDayPdf}
-                      className="font-heading cursor-pointer rounded-xl border border-[#FECACA] bg-[#FEF2F2] px-3 py-1.5 text-[11px] font-bold text-[#991B1B] transition-colors hover:bg-[#FEE2E2] active:scale-95 dark:border-[#7F1D1D] dark:bg-[#271518] dark:text-[#FCA5A5]"
-                    >
-                      📄 Exportar Dia (PDF)
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() =>
-                        syncTasksWithPhoneCalendar(
-                          visibleTasks,
-                          `bvs-special-${selectedDateKey}.ics`,
-                        )
-                      }
-                      className="font-heading cursor-pointer rounded-xl border border-[#E5E4E0] bg-[#F8F7F4] px-3 py-1.5 text-[11px] font-bold text-[#0F0F12] transition-colors hover:bg-[#ECE9E2] active:scale-95 dark:border-[#2E2E34] dark:bg-[#1C1C22] dark:text-[#FAFAFA]"
-                    >
-                      📲 Sincronizar (.ics)
-                    </button>
-                  </>
-                )}
-                <span className="font-heading rounded-xl bg-[#F1EFEA] px-3 py-1.5 text-[12px] font-bold text-[#27272A] dark:bg-[#27272A] dark:text-[#E4E4E7]">
-                  {pendingCount} pendente{pendingCount === 1 ? '' : 's'}
-                </span>
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={activeTab === 'agenda'}
+                  onClick={() => setActiveTab('agenda')}
+                  className={`min-h-[44px] flex-1 cursor-pointer rounded-xl px-4 text-[13px] font-bold transition-all sm:flex-initial ${
+                    activeTab === 'agenda'
+                      ? 'bg-white text-[#6F1D2B] shadow-xs dark:bg-[#27272A] dark:text-[#FCA5A5]'
+                      : 'text-[#52525B] hover:text-[#0F0F12] dark:text-[#A1A1AA] dark:hover:text-white'
+                  }`}
+                >
+                  📅 Agenda do Dia
+                </button>
               </div>
-            </div>
 
-            {/* Filtros Rápidos por Escopo */}
-            <div className="mb-5 flex flex-wrap items-center gap-2">
-              <FilterChip
-                label="Todos"
-                activeColor="#0F0F12"
-                selected={scopeFilter === 'all'}
-                onPress={() => setScopeFilter('all')}
-              />
-              <FilterChip
-                label="Trabalho"
-                activeColor={SCOPE_CONFIG.work.color}
-                dotColor={SCOPE_CONFIG.work.color}
-                selected={scopeFilter === 'work'}
-                onPress={() => setScopeFilter('work')}
-              />
-              <FilterChip
-                label="Pessoal"
-                activeColor={SCOPE_CONFIG.personal.color}
-                dotColor={SCOPE_CONFIG.personal.color}
-                selected={scopeFilter === 'personal'}
-                onPress={() => setScopeFilter('personal')}
-              />
-              <FilterChip
-                label="Estudo"
-                activeColor={SCOPE_CONFIG.study.color}
-                dotColor={SCOPE_CONFIG.study.color}
-                selected={scopeFilter === 'study'}
-                onPress={() => setScopeFilter('study')}
-              />
-              <span className="ml-auto text-right text-[11px] font-semibold text-[#71717A] dark:text-[#A1A1AA]">
-                Prioridade ↑
+              <span className="font-heading hidden text-[12px] font-semibold text-[#71717A] sm:inline dark:text-[#A1A1AA]">
+                Total geral: {tasks.length} tarefa(s)
               </span>
             </div>
 
-            {/* Lista de Tarefas com Animação de Entrada e Highlight */}
-            <div className="flex flex-1 flex-col pt-0.5">
-              {visibleTasks.length === 0 ? (
-                <div className="my-auto flex flex-col items-center gap-3 px-6 py-12 text-center">
-                  <div className="flex h-[58px] w-[58px] items-center justify-center rounded-[20px] bg-[#FEE2E2] text-[26px] font-bold text-[#991B1B] dark:bg-[#3B1219] dark:text-[#FCA5A5]">
-                    ✓
+            {activeTab === 'global' ? (
+              <GlobalTasksOverview
+                tasks={tasks}
+                folders={folders}
+                selectedFolderId={selectedFolderId}
+                onSelectFolder={setSelectedFolderId}
+                onCreateFolder={(name, scope) => addFolder(name, scope)}
+                onDeleteFolder={deleteFolder}
+                filterTodayOnly={filterTodayOnly}
+                todayIso={format(new Date(), 'yyyy-MM-dd')}
+                onToggleTodayOnly={setFilterTodayOnly}
+                onToggleTask={toggleTask}
+                onDeleteTask={deleteTask}
+                onAddAttachment={addAttachmentToTask}
+                onRemoveAttachment={removeAttachmentFromTask}
+                onNewTask={() => setIsModalVisible(true)}
+                onOpenImport={() => setIsImportModalOpen(true)}
+                onOpenAiReview={() => setIsAiReviewModalOpen(true)}
+                recentlyCreatedTaskId={recentlyCreatedTaskId}
+                highlightedTaskId={highlightedTaskId}
+                userName={currentUser.name}
+              />
+            ) : (
+              <>
+                <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
+                  <div>
+                    <h2 className="font-editorial text-[24px] sm:text-[28px] font-black tracking-tight text-[#0F0F12] dark:text-[#FAFAFA]">
+                      Agenda
+                    </h2>
+                    <p className="font-heading mt-0.5 text-[13px] font-semibold text-[#71717A] capitalize dark:text-[#A1A1AA]">
+                      {dateLabel.charAt(0).toUpperCase() + dateLabel.slice(1)}
+                    </p>
                   </div>
-                  <h3 className="text-[18px] font-bold tracking-tight text-[#0F0F12] dark:text-[#FAFAFA]">
-                    Tudo em dia
-                  </h3>
-                  <p className="mb-1 max-w-xs text-[13px] leading-[19px] text-[#71717A] dark:text-[#A1A1AA]">
-                    Nenhuma tarefa para este filtro ou data. Planeje seu próximo foco de Trabalho,
-                    Pessoal ou Estudo.
-                  </p>
-                  <Button onPress={() => setIsModalVisible(true)} variant="secondary">
-                    Criar tarefa
-                  </Button>
+
+                  <div className="flex flex-wrap items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={handleExportAllPdf}
+                      title="Exportar todas as tarefas cadastradas em arquivo PDF executivo"
+                      className="font-heading min-h-[44px] sm:min-h-[34px] cursor-pointer rounded-xl border border-[#991B1B]/40 bg-white px-3 py-1.5 text-[11px] font-bold text-[#991B1B] shadow-xs transition-colors hover:bg-[#FEF2F2] hover:border-[#991B1B] active:scale-95 dark:border-[#7F1D1D] dark:bg-[#1C1C22] dark:text-[#FCA5A5]"
+                    >
+                      📄 Todas em PDF
+                    </button>
+                    {visibleTasks.length > 0 && (
+                      <>
+                        <button
+                          type="button"
+                          onClick={handleExportDayPdf}
+                          className="font-heading min-h-[44px] sm:min-h-[34px] cursor-pointer rounded-xl border border-[#FECACA] bg-[#FEF2F2] px-3 py-1.5 text-[11px] font-bold text-[#991B1B] transition-colors hover:bg-[#FEE2E2] active:scale-95 dark:border-[#7F1D1D] dark:bg-[#271518] dark:text-[#FCA5A5]"
+                        >
+                          📄 Exportar Dia (PDF)
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            syncTasksWithPhoneCalendar(
+                              visibleTasks,
+                              `bvs-special-${selectedDateKey}.ics`,
+                            )
+                          }
+                          className="font-heading min-h-[44px] sm:min-h-[34px] cursor-pointer rounded-xl border border-[#E5E4E0] bg-[#F8F7F4] px-3 py-1.5 text-[11px] font-bold text-[#0F0F12] transition-colors hover:bg-[#ECE9E2] active:scale-95 dark:border-[#2E2E34] dark:bg-[#1C1C22] dark:text-[#FAFAFA]"
+                        >
+                          📲 Sincronizar (.ics)
+                        </button>
+                      </>
+                    )}
+                    <span className="font-heading rounded-xl bg-[#F1EFEA] px-3 py-1.5 text-[12px] font-bold text-[#27272A] dark:bg-[#27272A] dark:text-[#E4E4E7]">
+                      {pendingCount} pendente{pendingCount === 1 ? '' : 's'}
+                    </span>
+                  </div>
                 </div>
-              ) : (
-                <div className="flex flex-col gap-3.5">
-                  {visibleTasks.map((item) => (
-                    <TaskItem
-                      key={item.id}
-                      task={item}
-                      isRecentlyCreated={item.id === recentlyCreatedTaskId}
-                      isHighlighted={item.id === highlightedTaskId}
-                      folder={item.folderId ? folderMap.get(item.folderId) : undefined}
-                      onDelete={() => deleteTask(item.id)}
-                      onToggle={() => toggleTask(item.id)}
-                      onAddAttachment={(att) => addAttachmentToTask(item.id, att)}
-                      onRemoveAttachment={(attId) => removeAttachmentFromTask(item.id, attId)}
-                    />
-                  ))}
+
+                {/* Filtros Rápidos por Escopo */}
+                <div className="mb-5 flex flex-wrap items-center gap-2">
+                  <FilterChip
+                    label="Todos"
+                    activeColor="#0F0F12"
+                    selected={scopeFilter === 'all'}
+                    onPress={() => setScopeFilter('all')}
+                  />
+                  <FilterChip
+                    label="Trabalho"
+                    activeColor={SCOPE_CONFIG.work.color}
+                    dotColor={SCOPE_CONFIG.work.color}
+                    selected={scopeFilter === 'work'}
+                    onPress={() => setScopeFilter('work')}
+                  />
+                  <FilterChip
+                    label="Pessoal"
+                    activeColor={SCOPE_CONFIG.personal.color}
+                    dotColor={SCOPE_CONFIG.personal.color}
+                    selected={scopeFilter === 'personal'}
+                    onPress={() => setScopeFilter('personal')}
+                  />
+                  <FilterChip
+                    label="Estudo"
+                    activeColor={SCOPE_CONFIG.study.color}
+                    dotColor={SCOPE_CONFIG.study.color}
+                    selected={scopeFilter === 'study'}
+                    onPress={() => setScopeFilter('study')}
+                  />
+                  <span className="ml-auto text-right text-[11px] font-semibold text-[#71717A] dark:text-[#A1A1AA]">
+                    Prioridade ↑
+                  </span>
                 </div>
-              )}
-            </div>
+
+                {/* Lista de Tarefas com Animação de Entrada e Highlight */}
+                <div className="flex flex-1 flex-col pt-0.5">
+                  {visibleTasks.length === 0 ? (
+                    <div className="my-auto flex flex-col items-center gap-3 px-6 py-12 text-center">
+                      <div className="flex h-[58px] w-[58px] items-center justify-center rounded-[20px] bg-[#FEE2E2] text-[26px] font-bold text-[#991B1B] dark:bg-[#3B1219] dark:text-[#FCA5A5]">
+                        ✓
+                      </div>
+                      <h3 className="text-[18px] font-bold tracking-tight text-[#0F0F12] dark:text-[#FAFAFA]">
+                        Tudo em dia
+                      </h3>
+                      <p className="mb-1 max-w-xs text-[13px] leading-[19px] text-[#71717A] dark:text-[#A1A1AA]">
+                        Nenhuma tarefa para este filtro ou data. Planeje seu próximo foco de Trabalho,
+                        Pessoal ou Estudo.
+                      </p>
+                      <Button onPress={() => setIsModalVisible(true)} variant="secondary">
+                        Criar tarefa
+                      </Button>
+                    </div>
+                  ) : (
+                    <div className="flex flex-col gap-3.5">
+                      {visibleTasks.map((item) => (
+                        <TaskItem
+                          key={item.id}
+                          task={item}
+                          isRecentlyCreated={item.id === recentlyCreatedTaskId}
+                          isHighlighted={item.id === highlightedTaskId}
+                          folder={item.folderId ? folderMap.get(item.folderId) : undefined}
+                          onDelete={() => deleteTask(item.id)}
+                          onToggle={() => toggleTask(item.id)}
+                          onAddAttachment={(att) => addAttachmentToTask(item.id, att)}
+                          onRemoveAttachment={(attId) => removeAttachmentFromTask(item.id, attId)}
+                        />
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </>
+            )}
           </section>
         </main>
 
@@ -619,6 +831,27 @@ export function BVTasksApp() {
           defaultFolderId={selectedFolderId === 'all' ? '' : selectedFolderId}
           onClose={() => setIsModalVisible(false)}
           onSubmit={createTask}
+        />
+
+        {/* Modal / Bottom Sheet de Importação de Planejamento em Lote */}
+        <BulkImportModal
+          visible={isImportModalOpen}
+          folders={folders}
+          onClose={() => setIsImportModalOpen(false)}
+          onImportTasks={addTasksBulk}
+          onNotify={(msg) => showToast(msg, 'success')}
+        />
+
+        {/* Modal / Bottom Sheet de Fechamento Inteligente do Mês (Gemini IA) */}
+        <MonthlyReviewModal
+          visible={isAiReviewModalOpen}
+          tasks={tasks}
+          defaultMonth={selectedDateKey.slice(0, 7)}
+          hasPendingSync={pendingOfflineSync}
+          onSyncBeforeReview={syncWithDatabase}
+          onApplyAndMigrate={upsertTasksBulk}
+          onClose={() => setIsAiReviewModalOpen(false)}
+          onNotify={(msg) => showToast(msg, 'success')}
         />
 
         {/* Modal / Central de Sincronização Mobile & Offline */}
@@ -748,13 +981,24 @@ export function BVTasksApp() {
                 <button
                   type="button"
                   onClick={() => {
-                    syncTasksWithPhoneCalendar(tasks, 'bvs-special-completo.ics');
+                    syncTasksWithPhoneCalendar(tasks, 'cronograma-bv.ics');
                     setIsSyncModalOpen(false);
                     showToast('📲 Calendário exportado para o aparelho!', 'success');
                   }}
                   className="flex min-h-[44px] w-full cursor-pointer items-center justify-center gap-2 rounded-xl border border-[#D6D3CD] bg-white px-4 text-[13px] font-bold text-[#0F0F12] transition-all hover:bg-[#F8F7F4] active:scale-[0.99] dark:border-[#2E2E34] dark:bg-[#1C1C22] dark:text-[#FAFAFA]"
                 >
                   <span>📅 Exportar Todas as Tarefas (.ics do Celular)</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    void handleCopyIosCalendarLink();
+                    setIsSyncModalOpen(false);
+                  }}
+                  className="flex min-h-[44px] w-full cursor-pointer items-center justify-center gap-2 rounded-xl border border-[#E5D3D6] bg-[#FDF4F5] px-4 text-[13px] font-bold text-[#6F1D2B] transition-all hover:bg-[#FCE7E9] active:scale-[0.99] dark:border-[#4C1D24] dark:bg-[#2B1217] dark:text-[#FCA5A5]"
+                >
+                  <span>🔗 Copiar Link de Sincronização iOS (webcal://)</span>
                 </button>
 
                 <button
@@ -783,6 +1027,27 @@ export function BVTasksApp() {
           </p>
         </footer>
       </div>
+
+      {/* Mini-Chatbot Assistente de Ação Rápida (Exclusivo para Tarefas) */}
+      <TaskAssistantChat
+        visible={isAssistantOpen}
+        currentDate={selectedDateKey}
+        hasPendingSync={pendingOfflineSync}
+        onSyncBeforeAction={syncWithDatabase}
+        onAddSuggestedTasks={addTasksBulk}
+        onOpen={() => setIsAssistantOpen(true)}
+        onClose={() => setIsAssistantOpen(false)}
+        onNotify={(msg) => showToast(msg, 'success')}
+      />
+
+      {/* Menu Inferior Fixo Exclusivo Mobile (< 768px) com suporte a Safe Area do iPhone */}
+      <MobileBottomNav
+        activeTab={activeTab}
+        onChangeTab={setActiveTab}
+        onNewTask={() => setIsModalVisible(true)}
+        onOpenImport={() => setIsImportModalOpen(true)}
+        onOpenAssistant={() => setIsAssistantOpen(true)}
+      />
     </div>
   );
 }
@@ -802,7 +1067,7 @@ function FilterChip({ label, activeColor, dotColor, selected, onPress }: FilterC
       aria-pressed={selected}
       onClick={onPress}
       style={selected ? { backgroundColor: activeColor } : undefined}
-      className={`inline-flex min-h-[36px] cursor-pointer items-center gap-1.5 rounded-xl px-3.5 text-[12px] font-bold transition-all active:scale-95 ${
+      className={`inline-flex min-h-[44px] sm:min-h-[36px] cursor-pointer items-center gap-1.5 rounded-xl px-3.5 text-[12px] font-bold transition-all active:scale-95 ${
         selected
           ? 'text-white shadow-xs'
           : 'bg-[#F1EFEA] text-[#52525B] hover:bg-[#E5E2DC] dark:bg-[#1C1C22] dark:text-[#D4D4D8] dark:hover:bg-[#27272A]'

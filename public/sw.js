@@ -1,18 +1,19 @@
 /**
- * Service Worker do BVS Special PWA (v11)
+ * Service Worker do BVS Special PWA (v12)
  * - Bypass estrito para rotas de API (/api/*) garantindo leitura sempre em tempo real do SQL
  * - Network-First para navegação HTML (evita tela em branco após novo deploy no Render)
  * - Stale-While-Revalidate seguro para assets estáticos
  * - Limpeza automática de caches antigos
  */
 
-const CACHE_VERSION = 'bv-tasks-v11';
+const CACHE_VERSION = 'bv-tasks-v12';
 const STATIC_CACHE = `${CACHE_VERSION}-static`;
 const RUNTIME_CACHE = `${CACHE_VERSION}-runtime`;
 
 const APP_SHELL_ASSETS = [
   '/',
   '/index.html',
+  '/manifest.webmanifest',
   '/manifest.json',
   '/icon.svg',
   '/apple-touch-icon.png',

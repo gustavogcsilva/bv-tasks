@@ -1,3 +1,5 @@
+import { jsPDF } from 'jspdf';
+import autoTable from 'jspdf-autotable';
 import { SCOPE_CONFIG, type Task } from '../features/tasks/types/task.types';
 
 /**
@@ -146,23 +148,70 @@ export function generateIcsContent(tasks: Task[]): string {
 }
 
 /**
- * Exporta/Sincroniza uma ou mais tarefas abrindo o Calendário nativo do celular (.ics)
+ * Exporta/Sincroniza uma ou mais tarefas abrindo o Calendário nativo do iPhone/Android via Web Share API
+ * (`navigator.share` com `new File([icsContent], 'cronograma-bv.ics', { type: 'text/calendar' })`),
+ * mantendo o download direto (.ics) como fallback no Desktop.
  */
-export function syncTasksWithPhoneCalendar(tasks: Task[], filename = 'bvs-special-calendario.ics'): void {
+export function syncTasksWithPhoneCalendar(
+  tasks: Task[],
+  filename = 'cronograma-bv.ics',
+): void {
   if (tasks.length === 0 || typeof document === 'undefined') return;
 
+  const safeFilename = filename.toLowerCase().endsWith('.ics')
+    ? filename
+    : `${filename}.ics`;
   const icsContent = generateIcsContent(tasks);
   const blob = new Blob([icsContent], { type: 'text/calendar;charset=utf-8' });
-  const url = URL.createObjectURL(blob);
 
-  const link = document.createElement('a');
-  link.href = url;
-  link.setAttribute('download', filename);
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
+  const downloadFallback = () => {
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', safeFilename);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    setTimeout(() => URL.revokeObjectURL(url), 2500);
+  };
 
-  setTimeout(() => URL.revokeObjectURL(url), 2000);
+  try {
+    const isMobileOrIos =
+      typeof navigator !== 'undefined' &&
+      (/iPhone|iPad|iPod|Android/i.test(navigator.userAgent || '') ||
+        (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1));
+
+    if (
+      isMobileOrIos &&
+      typeof navigator !== 'undefined' &&
+      typeof navigator.share === 'function' &&
+      typeof File !== 'undefined'
+    ) {
+      const icsFile = new File([icsContent], safeFilename, { type: 'text/calendar' });
+      const canShareFiles =
+        typeof navigator.canShare === 'function'
+          ? navigator.canShare({ files: [icsFile] })
+          : true;
+
+      if (canShareFiles) {
+        void navigator
+          .share({
+            files: [icsFile],
+            title: 'Cronograma BVS Special (.ics)',
+            text: 'Adicionar tarefas ao Calendário do iPhone / Android',
+          })
+          .catch((err: unknown) => {
+            if (err instanceof Error && err.name === 'AbortError') return;
+            downloadFallback();
+          });
+        return;
+      }
+    }
+  } catch {
+    // Segue para download direto do .ics
+  }
+
+  downloadFallback();
 }
 
 /**
@@ -180,342 +229,562 @@ export function getGoogleCalendarUrl(task: Task): string {
   return `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${title}&dates=${dtStart}/${dtEnd}&details=${details}`;
 }
 
-/**
- * Converte caracteres acentuados e especiais para equivalentes seguros do encoding WinAnsi (PDF Type1 Standard Fonts)
- */
-function sanitizePdfText(text: string): string {
-  return (text || '')
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .replace(/[^\x20-\x7E]/g, ' ')
-    .replace(/\\/g, '\\\\')
-    .replace(/\(/g, '\\(')
-    .replace(/\)/g, '\\)')
-    .trim();
+export interface PdfExportOptions {
+  title?: string;
+  userName?: string;
+  periodLabel?: string;
 }
 
 /**
- * Gera o binário de um documento PDF de alto padrão executivo (ISO 32000-1 / PDF 1.4)
- * com cabeçalho bordeaux, logo vetorial BVS Special, KPIs, tabela estilizada e rodapé oficial.
+ * Converte string YYYY-MM-DD para DD/MM/YYYY amigável em português no relatório executivo.
+ */
+function formatDisplayDateBr(dateStr: string): string {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec((dateStr || '').trim());
+  if (!match) return dateStr || '-';
+  return `${match[3]}/${match[2]}/${match[1]}`;
+}
+
+/**
+ * Desenha o brasão vetorial BVS Special no cabeçalho do PDF (Garrafa + Taça + Livro Aberto).
+ */
+function drawBvsCrestOnPdf(doc: jsPDF, x: number, y: number, sizeMm: number): void {
+  const s = sizeMm / 24;
+
+  // Fundo escuro com moldura dourada
+  doc.setFillColor(15, 15, 18);
+  doc.setDrawColor(212, 175, 55);
+  doc.setLineWidth(0.5);
+  doc.roundedRect(x, y, sizeMm, sizeMm, 2.2, 2.2, 'FD');
+
+  // Garrafa de Vinho (esquerda)
+  doc.setFillColor(24, 24, 27);
+  doc.setDrawColor(253, 230, 138);
+  doc.setLineWidth(0.35);
+  doc.rect(x + 7.2 * s, y + 3.2 * s, 2.2 * s, 3.0 * s, 'FD');
+  doc.setFillColor(220, 38, 38);
+  doc.rect(x + 7.0 * s, y + 3.2 * s, 2.6 * s, 1.0 * s, 'F');
+  doc.setFillColor(24, 24, 27);
+  doc.roundedRect(x + 6.0 * s, y + 6.2 * s, 4.6 * s, 7.6 * s, 0.8 * s, 0.8 * s, 'FD');
+  doc.setFillColor(153, 27, 27);
+  doc.rect(x + 6.7 * s, y + 8.5 * s, 3.2 * s, 3.2 * s, 'F');
+
+  // Taça de Vinho (direita)
+  doc.setFillColor(220, 38, 38);
+  doc.triangle(
+    x + 12.6 * s,
+    y + 7.0 * s,
+    x + 17.6 * s,
+    y + 7.0 * s,
+    x + 15.1 * s,
+    y + 11.2 * s,
+    'F',
+  );
+  doc.setDrawColor(253, 230, 138);
+  doc.setLineWidth(0.4);
+  doc.line(x + 12.3 * s, y + 6.0 * s, x + 17.9 * s, y + 6.0 * s);
+  doc.line(x + 15.1 * s, y + 11.0 * s, x + 15.1 * s, y + 14.0 * s);
+  doc.line(x + 13.4 * s, y + 14.0 * s, x + 16.8 * s, y + 14.0 * s);
+
+  // Livro Aberto na base
+  doc.setFillColor(250, 250, 250);
+  doc.setDrawColor(253, 230, 138);
+  doc.roundedRect(x + 4.4 * s, y + 15.2 * s, 15.2 * s, 3.6 * s, 0.6 * s, 0.6 * s, 'FD');
+  doc.setDrawColor(153, 27, 27);
+  doc.setLineWidth(0.5);
+  doc.line(x + 12.0 * s, y + 15.2 * s, x + 12.0 * s, y + 18.8 * s);
+
+  // Badge BVS SPECIAL
+  doc.setFillColor(9, 9, 11);
+  doc.setDrawColor(212, 175, 55);
+  doc.setLineWidth(0.3);
+  doc.roundedRect(x + 2.4 * s, y + 19.6 * s, 19.2 * s, 3.2 * s, 0.7 * s, 0.7 * s, 'FD');
+  doc.setTextColor(253, 230, 138);
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(4.6);
+  doc.text('BVS SPECIAL', x + sizeMm / 2, y + 21.8 * s, { align: 'center' });
+}
+
+/**
+ * Gera o binário de um relatório PDF executivo moderno e diferenciado usando jsPDF + jsPDF-AutoTable:
+ * - Faixa superior colorida + filete dourado + brasão vetorial BVS Special
+ * - Período analisado, usuário e data/hora de emissão
+ * - Cards de KPIs no topo (Total, Concluídas com %, Pendentes, Alta Prioridade)
+ * - Tabela limpa com zebra-striping, badges coloridos de Prioridade e Status
+ * - Quebra automática de página sem cortar linhas e rodapé "Página X de Y"
  */
 export function generateTasksPdfBytes(
   tasks: Task[],
-  options?: { title?: string; userName?: string },
+  options?: PdfExportOptions,
 ): Uint8Array {
+  const doc = new jsPDF({
+    orientation: 'portrait',
+    unit: 'mm',
+    format: 'a4',
+    compress: false,
+  });
+
+  const pageWidth = doc.internal.pageSize.getWidth(); // 210mm
+  const pageHeight = doc.internal.pageSize.getHeight(); // 297mm
+  const marginX = 14;
+  const contentWidth = pageWidth - marginX * 2;
   const currentYear = new Date().getFullYear();
-  const rawTitle = options?.title || 'Relatorio Executivo de Tarefas';
-  const reportTitle = sanitizePdfText(rawTitle);
-  const rawUser = options?.userName || 'Gustavo Geraldo';
-  const userName = sanitizePdfText(rawUser);
+
+  const reportTitle = (options?.title || 'Relatorio Executivo de Tarefas').trim();
+  const userName = (options?.userName || 'Gustavo Geraldo').trim();
+
+  // Dedução automática do período analisado caso não informado
+  const sortedDates = tasks
+    .map((t) => t.date)
+    .filter((d) => /^\d{4}-\d{2}-\d{2}$/.test(d))
+    .sort();
+  const derivedPeriod =
+    options?.periodLabel ||
+    (sortedDates.length === 0
+      ? 'Todo o Planejamento'
+      : sortedDates[0] === sortedDates[sortedDates.length - 1]
+        ? formatDisplayDateBr(sortedDates[0])
+        : `${formatDisplayDateBr(sortedDates[0])} a ${formatDisplayDateBr(
+            sortedDates[sortedDates.length - 1],
+          )}`);
 
   const now = new Date();
   const pad = (n: number) => String(n).padStart(2, '0');
-  const generatedDateTime = `${pad(now.getDate())}/${pad(now.getMonth() + 1)}/${now.getFullYear()} ${pad(
+  const generatedDateTime = `${pad(now.getDate())}/${pad(now.getMonth() + 1)}/${now.getFullYear()} as ${pad(
     now.getHours(),
   )}:${pad(now.getMinutes())}`;
 
-  // Métricas para os Cards de KPI
+  // 1. Cabeçalho Executivo Estilizado (Faixa Bordeaux + Filete Dourado)
+  const headerHeight = 38;
+  doc.setFillColor(69, 10, 10); // Vinho escuro profundo #450A0A
+  doc.rect(0, 0, pageWidth, headerHeight, 'F');
+  doc.setFillColor(127, 29, 29); // Gradiente visual bordeaux
+  doc.rect(0, 0, pageWidth, 8, 'F');
+  doc.setFillColor(212, 175, 55); // Filete dourado inferior #D4AF37
+  doc.rect(0, headerHeight, pageWidth, 1.4, 'F');
+
+  // Brasão vetorial BVS Special no cabeçalho
+  drawBvsCrestOnPdf(doc, marginX, 7, 24);
+
+  // Títulos principais ao lado do logo
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(7.5);
+  doc.setTextColor(253, 230, 138);
+  doc.text('BVS SPECIAL  |  EXECUTIVE PLANNER', marginX + 28, 12.5);
+
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(15.5);
+  doc.setTextColor(255, 255, 255);
+  const titleLines = doc.splitTextToSize(reportTitle, 95);
+  doc.text(titleLines[0] || 'Relatorio Executivo', marginX + 28, 19.5);
+
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(8.5);
+  doc.setTextColor(228, 228, 231);
+  doc.text(`Periodo analisado: ${derivedPeriod}`, marginX + 28, 25.5);
+  doc.text(`Emitido em: ${generatedDateTime}`, marginX + 28, 30.2);
+
+  // Bloco de Metadados à direita
+  const metaBoxW = 54;
+  const metaBoxX = pageWidth - marginX - metaBoxW;
+  doc.setFillColor(38, 8, 10);
+  doc.setDrawColor(212, 175, 55);
+  doc.setLineWidth(0.35);
+  doc.roundedRect(metaBoxX, 8.5, metaBoxW, 23, 2, 2, 'FD');
+
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(6.8);
+  doc.setTextColor(253, 230, 138);
+  doc.text('GESTOR / CONTA', metaBoxX + 3.5, 13.5);
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(8.5);
+  doc.setTextColor(255, 255, 255);
+  doc.text(userName.slice(0, 24), metaBoxX + 3.5, 18.0);
+
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(6.8);
+  doc.setTextColor(253, 230, 138);
+  doc.text('REGISTROS NO DOCUMENTO', metaBoxX + 3.5, 23.5);
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(8.2);
+  doc.setTextColor(228, 228, 231);
+  doc.text(`${tasks.length} tarefa(s) listadas`, metaBoxX + 3.5, 27.8);
+
+  // 2. Dashboard com 4 Cards de KPIs no topo
   const totalCount = tasks.length;
   const completedCount = tasks.filter((t) => t.isCompleted).length;
   const pendingCount = totalCount - completedCount;
+  const completionPct = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0;
   const highPriorityCount = tasks.filter((t) => t.priority === 'high' && !t.isCompleted).length;
 
-  const priorityLabelMap: Record<string, string> = {
-    high: 'ALTA',
-    medium: 'MEDIA',
-    low: 'BAIXA',
-  };
+  const kpiY = 44.5;
+  const kpiGap = 3.5;
+  const kpiW = (contentWidth - kpiGap * 3) / 4;
+  const kpiH = 19;
 
-  // Separa as tarefas em páginas de acordo com a altura disponível
-  // Página 1: y começa em 615 após cabeçalho completo e cards de KPI
-  // Páginas 2+: y começa em 745 após cabeçalho compacto
-  const pagesOps: string[][] = [];
-  let currentPageOps: string[] = [];
-  let currentY = 615;
-  const bottomMargin = 55;
+  const kpis: Array<{
+    label: string;
+    value: string;
+    sub: string;
+    bg: [number, number, number];
+    border: [number, number, number];
+    accent: [number, number, number];
+    text: [number, number, number];
+  }> = [
+    {
+      label: 'TOTAL DE TAREFAS',
+      value: String(totalCount),
+      sub: 'Escopo do relatorio',
+      bg: [248, 247, 244],
+      border: [226, 224, 219],
+      accent: [24, 24, 27],
+      text: [15, 15, 18],
+    },
+    {
+      label: 'CONCLUIDAS',
+      value: `${completedCount} (${completionPct}%)`,
+      sub: 'Taxa de conclusao',
+      bg: [240, 253, 244],
+      border: [187, 247, 208],
+      accent: [22, 163, 74],
+      text: [21, 128, 61],
+    },
+    {
+      label: 'PENDENTES',
+      value: String(pendingCount),
+      sub: 'Aguardando acao',
+      bg: [255, 247, 237],
+      border: [254, 215, 170],
+      accent: [217, 119, 6],
+      text: [180, 83, 9],
+    },
+    {
+      label: 'ALTA PRIORIDADE',
+      value: String(highPriorityCount),
+      sub: 'Criticas pendentes',
+      bg: [254, 242, 242],
+      border: [254, 202, 202],
+      accent: [185, 28, 28],
+      text: [153, 27, 27],
+    },
+  ];
 
-  function startNewPage() {
-    if (currentPageOps.length > 0) {
-      pagesOps.push(currentPageOps);
-    }
-    currentPageOps = [];
-    currentY = 745;
-  }
+  kpis.forEach((card, idx) => {
+    const cx = marginX + idx * (kpiW + kpiGap);
+    doc.setFillColor(...card.bg);
+    doc.setDrawColor(...card.border);
+    doc.setLineWidth(0.35);
+    doc.roundedRect(cx, kpiY, kpiW, kpiH, 2.2, 2.2, 'FD');
 
-  // Prepara a primeira página
-  // Desenho do Cabeçalho Executivo Completo da Página 1
-  currentPageOps.push(
-    // 1. Banner Superior Bordeaux Escuro
-    '0.27 0.04 0.04 rg 0 726 595 116 re f',
-    // 2. Linha Dourada de Prestígio
-    '0.85 0.68 0.25 RG 2.5 w 0 724 m 595 724 l S',
-    // 3. Brasão do Logo BVS Special (x=36, y=736, w=66, h=66)
-    '0.06 0.06 0.08 rg 36 736 66 66 re f',
-    '0.85 0.68 0.25 RG 1.5 w 36 736 66 66 re S',
-    '0.85 0.68 0.25 RG 0.5 w 39 739 60 60 re S',
-    // 3.1 Garrafa de vinho vetorial dentro do brasão
-    '0.05 0.05 0.06 rg 52 776 5 14 re f',
-    '0.85 0.12 0.15 rg 51 785 7 5 re f',
-    '0.10 0.10 0.12 rg 48 752 13 24 re f',
-    '0.60 0.10 0.12 rg 49 757 11 13 re f',
-    '0.85 0.68 0.25 RG 0.6 w 48 752 13 24 re S',
-    // 3.2 Taça de vinho vetorial dentro do brasão
-    '0.10 0.10 0.12 rg 68 763 15 15 re f',
-    '0.85 0.12 0.15 rg 69 765 13 10 re f',
-    '0.85 0.68 0.25 RG 1.5 w 75 754 m 75 763 l S',
-    '0.85 0.68 0.25 RG 1.5 w 70 754 m 80 754 l S',
-    // 3.3 Livro aberto na base do brasão
-    '0.96 0.96 0.96 rg 43 744 52 8 re f',
-    '0.60 0.10 0.12 RG 1.5 w 69 744 m 69 752 l S',
-    // 3.4 Inscrição BVS SPECIAL na base do brasão
-    'BT /F2 6.5 Tf 0.95 0.85 0.45 rg 43 738 Td (BVS SPECIAL) Tj ET',
-    // 4. Tipografia de Título ao lado do Brasão
-    'BT /F2 8.5 Tf 0.95 0.85 0.45 rg 114 804 Td (EXECUTIVE PLANNER - RELATORIO CORPORATIVO) Tj ET',
-    'BT /F2 22 Tf 1 1 1 rg 114 782 Td (BVS Special) Tj ET',
-    `BT /F1 10.5 Tf 0.92 0.90 0.88 rg 114 766 Td (${reportTitle.slice(0, 52)}) Tj ET`,
-    'BT /F1 8 Tf 0.80 0.78 0.75 rg 114 750 Td (Sistema Executivo de Planejamento e Alta Produtividade) Tj ET',
-    // 5. Painel de Metadados Executivos à Direita
-    '0.18 0.03 0.04 rg 382 736 177 66 re f',
-    '0.85 0.68 0.25 RG 0.8 w 382 736 177 66 re S',
-    `BT /F2 7.5 Tf 0.95 0.85 0.45 rg 390 790 Td (EMISSAO:) Tj /F1 7.5 Tf 1 1 1 rg 440 790 Td (${generatedDateTime}) Tj ET`,
-    `BT /F2 7.5 Tf 0.95 0.85 0.45 rg 390 776 Td (USUARIO:) Tj /F1 7.5 Tf 1 1 1 rg 440 776 Td (${userName.slice(0, 20)}) Tj ET`,
-    `BT /F2 7.5 Tf 0.95 0.85 0.45 rg 390 762 Td (REGISTROS:) Tj /F1 7.5 Tf 1 1 1 rg 440 762 Td (${totalCount} tarefa(s)) Tj ET`,
-    'BT /F2 7 Tf 0.95 0.35 0.35 rg 390 748 Td ([ DOCUMENTO EXECUTIVO CONFIDENCIAL ]) Tj ET',
-    // 6. Dashboard de KPIs (4 Cards de Métricas)
-    // Card 1: Total
-    '0.96 0.96 0.95 rg 36 660 124 48 re f',
-    '0.85 0.83 0.80 RG 1 w 36 660 124 48 re S',
-    '0.30 0.30 0.35 rg 36 705 124 3 re f',
-    `BT /F2 16 Tf 0.08 0.08 0.10 rg 48 679 Td (${totalCount}) Tj ET`,
-    'BT /F2 7.5 Tf 0.40 0.40 0.45 rg 48 668 Td (TOTAL DE TAREFAS) Tj ET',
-    // Card 2: Concluídas
-    '0.94 0.98 0.95 rg 169 660 124 48 re f',
-    '0.70 0.88 0.75 RG 1 w 169 660 124 48 re S',
-    '0.08 0.55 0.22 rg 169 705 124 3 re f',
-    `BT /F2 16 Tf 0.08 0.55 0.22 rg 181 679 Td (${completedCount}) Tj ET`,
-    'BT /F2 7.5 Tf 0.08 0.50 0.20 rg 181 668 Td (TAREFAS CONCLUIDAS) Tj ET',
-    // Card 3: Pendentes
-    '0.99 0.97 0.93 rg 302 660 124 48 re f',
-    '0.92 0.80 0.65 RG 1 w 302 660 124 48 re S',
-    '0.85 0.45 0.05 rg 302 705 124 3 re f',
-    `BT /F2 16 Tf 0.85 0.45 0.05 rg 314 679 Td (${pendingCount}) Tj ET`,
-    'BT /F2 7.5 Tf 0.75 0.40 0.05 rg 314 668 Td (TAREFAS PENDENTES) Tj ET',
-    // Card 4: Alta Prioridade
-    '0.99 0.94 0.94 rg 435 660 124 48 re f',
-    '0.95 0.75 0.75 RG 1 w 435 660 124 48 re S',
-    '0.75 0.08 0.10 rg 435 705 124 3 re f',
-    `BT /F2 16 Tf 0.75 0.08 0.10 rg 447 679 Td (${highPriorityCount}) Tj ET`,
-    'BT /F2 7.5 Tf 0.75 0.08 0.10 rg 447 668 Td (ALTA PRIORIDADE) Tj ET',
-    // 7. Cabeçalho da Tabela de Tarefas
-    '0.20 0.03 0.04 rg 36 630 523 20 re f',
-    '0.85 0.68 0.25 RG 0.5 w 36 630 523 20 re S',
-    'BT /F2 8 Tf 1 1 1 rg 46 636 Td (STATUS) Tj ET',
-    'BT /F2 8 Tf 1 1 1 rg 125 636 Td (TAREFA & ESCOPO) Tj ET',
-    'BT /F2 8 Tf 1 1 1 rg 375 636 Td (DATA & HORARIO) Tj ET',
-    'BT /F2 8 Tf 1 1 1 rg 480 636 Td (PRIORIDADE) Tj ET',
-  );
+    // Tarja superior colorida do card
+    doc.setFillColor(...card.accent);
+    doc.roundedRect(cx, kpiY, kpiW, 1.5, 0.7, 0.7, 'F');
 
-  currentY = 624;
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(6.5);
+    doc.setTextColor(113, 113, 122);
+    doc.text(card.label, cx + 3.2, kpiY + 5.8);
 
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(12.5);
+    doc.setTextColor(...card.text);
+    doc.text(card.value, cx + 3.2, kpiY + 12.2);
+
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(6.5);
+    doc.setTextColor(113, 113, 122);
+    doc.text(card.sub, cx + 3.2, kpiY + 16.6);
+  });
+
+  // 3. Tabela Executiva com Zebra-Striping e Badges Coloridos via jsPDF-AutoTable
   if (tasks.length === 0) {
-    currentPageOps.push(
-      '0.98 0.98 0.97 rg 36 565 523 50 re f',
-      '0.88 0.86 0.84 RG 1 w 36 565 523 50 re S',
-      'BT /F2 11 Tf 0.25 0.25 0.28 rg 50 592 Td (Nenhuma tarefa cadastrada para o filtro ou periodo selecionado.) Tj ET',
-      'BT /F1 9 Tf 0.50 0.50 0.55 rg 50 578 Td (Planeje suas metas de Trabalho, Pessoal ou Estudo no BVS Special.) Tj ET',
+    doc.setFillColor(250, 249, 247);
+    doc.setDrawColor(226, 224, 219);
+    doc.roundedRect(marginX, 70, contentWidth, 26, 3, 3, 'FD');
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(11);
+    doc.setTextColor(39, 39, 42);
+    doc.text('Nenhuma tarefa encontrada para os filtros selecionados.', pageWidth / 2, 81, {
+      align: 'center',
+    });
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(8.5);
+    doc.setTextColor(113, 113, 122);
+    doc.text(
+      'Crie novas tarefas ou importe seu planejamento no aplicativo BVS Special.',
+      pageWidth / 2,
+      88,
+      { align: 'center' },
     );
   } else {
-    tasks.forEach((task, idx) => {
-      const hasDescription = Boolean(task.description?.trim());
-      const cardHeight = hasDescription ? 48 : 36;
+    const scopeNameMap: Record<string, string> = {
+      work: 'Trabalho',
+      personal: 'Pessoal',
+      study: 'Estudo',
+    };
+    const priorityNameMap: Record<string, string> = {
+      high: 'Alta',
+      medium: 'Media',
+      low: 'Baixa',
+    };
 
-      // Se não couber na página atual, inicia uma nova página
-      if (currentY - cardHeight < bottomMargin + 10) {
-        startNewPage();
-        // Cabeçalho Compacto para Páginas Subsequentes (Página 2, 3...)
-        currentPageOps.push(
-          '0.27 0.04 0.04 rg 0 782 595 60 re f',
-          '0.85 0.68 0.25 RG 2 w 0 780 m 595 780 l S',
-          '0.06 0.06 0.08 rg 36 786 48 48 re f',
-          '0.85 0.68 0.25 RG 1 w 36 786 48 48 re S',
-          'BT /F2 7 Tf 0.95 0.85 0.45 rg 40 806 Td (BVS SPECIAL) Tj ET',
-          'BT /F2 14 Tf 1 1 1 rg 96 812 Td (BVS Special - Relatorio de Tarefas (Continuacao)) Tj ET',
-          `BT /F1 8.5 Tf 0.88 0.86 0.84 rg 96 798 Td (Emitido em ${generatedDateTime} | Gestor: ${userName}) Tj ET`,
-          // Tabela Header na página de continuação
-          '0.20 0.03 0.04 rg 36 754 523 20 re f',
-          '0.85 0.68 0.25 RG 0.5 w 36 754 523 20 re S',
-          'BT /F2 8 Tf 1 1 1 rg 46 760 Td (STATUS) Tj ET',
-          'BT /F2 8 Tf 1 1 1 rg 125 760 Td (TAREFA & ESCOPO) Tj ET',
-          'BT /F2 8 Tf 1 1 1 rg 375 760 Td (DATA & HORARIO) Tj ET',
-          'BT /F2 8 Tf 1 1 1 rg 480 760 Td (PRIORIDADE) Tj ET',
-        );
-        currentY = 748;
-      }
+    const tableRows = tasks.map((task) => {
+      const desc = task.description?.trim() ? `\nObs.: ${task.description.trim()}` : '';
+      const timeStr = task.time ? `\nas ${task.time}` : '\nDia todo';
+      return {
+        statusRaw: task.isCompleted ? 'CONCLUIDA' : 'PENDENTE',
+        titleBlock: `${task.title}${desc}`,
+        scopeRaw: scopeNameMap[task.scope] || 'Trabalho',
+        scopeKey: task.scope,
+        dateTime: `${formatDisplayDateBr(task.date)}${timeStr}`,
+        priorityRaw: priorityNameMap[task.priority] || 'Media',
+        priorityKey: task.priority,
+      };
+    });
 
-      const cardBottomY = currentY - cardHeight;
-      const isEven = idx % 2 === 0;
+    autoTable(doc, {
+      startY: 69,
+      margin: { top: 26, bottom: 20, left: marginX, right: marginX },
+      rowPageBreak: 'avoid',
+      showHead: 'everyPage',
+      theme: 'striped',
+      headStyles: {
+        fillColor: [69, 10, 10],
+        textColor: [255, 255, 255],
+        fontStyle: 'bold',
+        fontSize: 8,
+        cellPadding: { top: 3.2, bottom: 3.2, left: 3, right: 3 },
+      },
+      bodyStyles: {
+        fontSize: 8.2,
+        textColor: [24, 24, 27],
+        cellPadding: { top: 3.2, bottom: 3.2, left: 3, right: 3 },
+        valign: 'middle',
+        lineColor: [235, 233, 228],
+        lineWidth: 0.2,
+      },
+      alternateRowStyles: {
+        fillColor: [250, 249, 247],
+      },
+      columns: [
+        { header: 'STATUS', dataKey: 'statusRaw' },
+        { header: 'TAREFA & OBSERVACOES', dataKey: 'titleBlock' },
+        { header: 'CATEGORIA', dataKey: 'scopeRaw' },
+        { header: 'DATA / HORA', dataKey: 'dateTime' },
+        { header: 'PRIORIDADE', dataKey: 'priorityRaw' },
+      ],
+      body: tableRows,
+      columnStyles: {
+        statusRaw: { cellWidth: 25, halign: 'center' },
+        titleBlock: { cellWidth: 83, halign: 'left' },
+        scopeRaw: { cellWidth: 24, halign: 'center' },
+        dateTime: { cellWidth: 26, halign: 'center' },
+        priorityRaw: { cellWidth: 24, halign: 'center' },
+      },
+      willDrawCell: (data) => {
+        if (data.section === 'body') {
+          // Oculta o texto padrão das colunas com badges desenhados manualmente
+          if (
+            data.column.dataKey === 'statusRaw' ||
+            data.column.dataKey === 'priorityRaw' ||
+            data.column.dataKey === 'scopeRaw'
+          ) {
+            data.cell.text = [''];
+          }
+        }
+      },
+      didDrawCell: (data) => {
+        if (data.section !== 'body') return;
+        const rowRaw = tableRows[data.row.index];
+        if (!rowRaw) return;
 
-      // Cores por escopo: Trabalho = Vinho, Pessoal = Azul, Estudo = Rosa
-      const scopeColorRgb =
-        task.scope === 'personal'
-          ? '0.15 0.40 0.85'
-          : task.scope === 'study'
-            ? '0.85 0.15 0.45'
-            : '0.60 0.10 0.10';
+        const cellCenterX = data.cell.x + data.cell.width / 2;
+        const cellCenterY = data.cell.y + data.cell.height / 2;
+        const badgeW = data.cell.width - 4;
+        const badgeH = 5.6;
+        const badgeX = cellCenterX - badgeW / 2;
+        const badgeY = cellCenterY - badgeH / 2;
 
-      const scopeName =
-        task.scope === 'personal' ? 'Pessoal' : task.scope === 'study' ? 'Estudo' : 'Trabalho';
+        if (data.column.dataKey === 'statusRaw') {
+          const isDone = rowRaw.statusRaw === 'CONCLUIDA';
+          doc.setFillColor(...(isDone ? [220, 252, 231] : [244, 244, 245]) as [number, number, number]);
+          doc.setDrawColor(...(isDone ? [134, 239, 172] : [212, 212, 216]) as [number, number, number]);
+          doc.setLineWidth(0.25);
+          doc.roundedRect(badgeX, badgeY, badgeW, badgeH, 1.5, 1.5, 'FD');
 
-      // Cor de fundo alternada sutil
-      const bgRgb = isEven ? '0.985 0.985 0.98' : '0.96 0.96 0.95';
-      currentPageOps.push(
-        `${bgRgb} rg 36 ${cardBottomY} 523 ${cardHeight} re f`,
-        '0.88 0.86 0.84 RG 0.5 w 36 ${cardBottomY} 523 ${cardHeight} re S',
-        // Barra lateral indicadora de escopo
-        `${scopeColorRgb} rg 36 ${cardBottomY} 4.5 ${cardHeight} re f`,
-      );
+          doc.setFont('helvetica', 'bold');
+          doc.setFontSize(6.6);
+          doc.setTextColor(...(isDone ? [21, 128, 61] : [63, 63, 70]) as [number, number, number]);
+          doc.text(rowRaw.statusRaw, cellCenterX, cellCenterY + 1.1, { align: 'center' });
+        }
 
-      // Badge de Status
-      const statusText = task.isCompleted ? '[ CONCLUIDA ]' : '[ PENDENTE ]';
-      const statusColor = task.isCompleted ? '0.08 0.55 0.22' : '0.40 0.40 0.45';
-      currentPageOps.push(
-        `BT /F2 8 Tf ${statusColor} rg 46 ${cardBottomY + cardHeight - 16} Td (${statusText}) Tj ET`,
-      );
+        if (data.column.dataKey === 'scopeRaw') {
+          const palette: Record<
+            string,
+            { bg: [number, number, number]; fg: [number, number, number] }
+          > = {
+            work: { bg: [254, 226, 226], fg: [153, 27, 27] },
+            personal: { bg: [219, 234, 254], fg: [37, 99, 235] },
+            study: { bg: [252, 231, 243], fg: [219, 39, 119] },
+          };
+          const colors = palette[rowRaw.scopeKey] || palette.work;
+          doc.setFillColor(...colors.bg);
+          doc.roundedRect(badgeX, badgeY, badgeW, badgeH, 1.5, 1.5, 'F');
+          doc.setFont('helvetica', 'bold');
+          doc.setFontSize(6.8);
+          doc.setTextColor(...colors.fg);
+          doc.text(rowRaw.scopeRaw, cellCenterX, cellCenterY + 1.1, { align: 'center' });
+        }
 
-      // Título da Tarefa
-      const cleanTitle = sanitizePdfText(task.title).slice(0, 48);
-      const titleColor = task.isCompleted ? '0.45 0.45 0.48' : '0.08 0.08 0.10';
-      currentPageOps.push(
-        `BT /F2 9.5 Tf ${titleColor} rg 125 ${cardBottomY + cardHeight - 16} Td (${cleanTitle}) Tj ET`,
-      );
+        if (data.column.dataKey === 'priorityRaw') {
+          const palette: Record<
+            string,
+            {
+              bg: [number, number, number];
+              border: [number, number, number];
+              fg: [number, number, number];
+            }
+          > = {
+            high: { bg: [254, 226, 226], border: [252, 165, 165], fg: [185, 28, 28] },
+            medium: { bg: [254, 243, 199], border: [252, 211, 77], fg: [180, 83, 9] },
+            low: { bg: [209, 250, 229], border: [110, 231, 183], fg: [4, 120, 87] },
+          };
+          const colors = palette[rowRaw.priorityKey] || palette.medium;
+          doc.setFillColor(...colors.bg);
+          doc.setDrawColor(...colors.border);
+          doc.setLineWidth(0.25);
+          doc.roundedRect(badgeX, badgeY, badgeW, badgeH, 1.5, 1.5, 'FD');
 
-      // Sub-linha do escopo
-      currentPageOps.push(
-        `BT /F1 7.5 Tf ${scopeColorRgb} rg 125 ${cardBottomY + cardHeight - 27} Td (Escopo: ${scopeName}) Tj ET`,
-      );
+          doc.setFont('helvetica', 'bold');
+          doc.setFontSize(6.8);
+          doc.setTextColor(...colors.fg);
+          doc.text(rowRaw.priorityRaw.toUpperCase(), cellCenterX, cellCenterY + 1.1, {
+            align: 'center',
+          });
+        }
+      },
+      didDrawPage: (data) => {
+        // Cabeçalho compacto automático nas páginas 2+
+        if (data.pageNumber > 1) {
+          doc.setFillColor(69, 10, 10);
+          doc.rect(0, 0, pageWidth, 18, 'F');
+          doc.setFillColor(212, 175, 55);
+          doc.rect(0, 18, pageWidth, 0.9, 'F');
 
-      // Data e Horário
-      const timeInfo = task.time ? ` as ${sanitizePdfText(task.time)}` : ' (dia todo)';
-      currentPageOps.push(
-        `BT /F1 8.5 Tf 0.25 0.25 0.28 rg 375 ${cardBottomY + cardHeight - 16} Td (${sanitizePdfText(task.date)}${timeInfo}) Tj ET`,
-      );
+          drawBvsCrestOnPdf(doc, marginX, 2.5, 13);
 
-      // Badge de Prioridade
-      const prioLabel = priorityLabelMap[task.priority] ?? 'MEDIA';
-      const prioColor =
-        task.priority === 'high'
-          ? '0.75 0.08 0.10'
-          : task.priority === 'low'
-            ? '0.08 0.55 0.22'
-            : '0.85 0.45 0.05';
-      currentPageOps.push(
-        `BT /F2 8.5 Tf ${prioColor} rg 480 ${cardBottomY + cardHeight - 16} Td (${prioLabel}) Tj ET`,
-      );
+          doc.setFont('helvetica', 'bold');
+          doc.setFontSize(10.5);
+          doc.setTextColor(255, 255, 255);
+          doc.text('BVS Special - Continuacao do Relatorio Executivo', marginX + 16, 8.5);
 
-      // Linha de Descrição (caso exista)
-      if (hasDescription && task.description) {
-        const cleanDesc = sanitizePdfText(task.description).slice(0, 80);
-        currentPageOps.push(
-          `BT /F1 7.5 Tf 0.45 0.45 0.48 rg 125 ${cardBottomY + 8} Td (Obs.: ${cleanDesc}) Tj ET`,
-        );
-      }
-
-      currentY -= cardHeight + 4;
+          doc.setFont('helvetica', 'normal');
+          doc.setFontSize(7.5);
+          doc.setTextColor(228, 228, 231);
+          doc.text(
+            `Periodo: ${derivedPeriod}  |  Emitido em: ${generatedDateTime}`,
+            marginX + 16,
+            13.5,
+          );
+        }
+      },
     });
   }
 
-  // Encerra a última página em andamento
-  if (currentPageOps.length > 0) {
-    pagesOps.push(currentPageOps);
-  }
+  // 4. Rodapé Oficial com numeração exata "Página X de Y" em TODAS as páginas
+  const totalPages = doc.getNumberOfPages();
+  for (let i = 1; i <= totalPages; i++) {
+    doc.setPage(i);
+    const footerLineY = pageHeight - 13;
+    doc.setDrawColor(212, 175, 55);
+    doc.setLineWidth(0.35);
+    doc.line(marginX, footerLineY, pageWidth - marginX, footerLineY);
 
-  const totalPages = Math.max(1, pagesOps.length);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(7.5);
+    doc.setTextColor(153, 27, 27);
+    doc.text('BVS Special', marginX, footerLineY + 5);
 
-  // Adiciona o Rodapé Oficial em TODAS as páginas geradas
-  pagesOps.forEach((pageOps, pageIdx) => {
-    pageOps.push(
-      '0.85 0.68 0.25 RG 0.8 w 36 38 m 559 38 l S',
-      'BT /F2 7.5 Tf 0.55 0.08 0.10 rg 36 26 Td (BVS Special) Tj ET',
-      `BT /F1 7.5 Tf 0.40 0.40 0.45 rg 92 26 Td (| Created By Gustavo Geraldo (c) ${currentYear} - Todos os direitos reservados) Tj ET`,
-      `BT /F2 7.5 Tf 0.40 0.40 0.45 rg 486 26 Td (Pagina ${pageIdx + 1} de ${totalPages}) Tj ET`,
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(7.5);
+    doc.setTextColor(113, 113, 122);
+    doc.text(
+      `  |  Created By Gustavo Geraldo (c) ${currentYear} - Todos os direitos reservados`,
+      marginX + 17.5,
+      footerLineY + 5,
     );
-  });
 
-  // Montagem do Arquivo PDF ISO 32000-1 / PDF 1.4
-  // Objetos fixos:
-  // 1 0 obj: Catalog
-  // 2 0 obj: Pages
-  // 3 0 obj: Font F1 (Helvetica)
-  // 4 0 obj: Font F2 (Helvetica-Bold)
-  // Depois para cada página i:
-  // Objeto Page (5 + 2*i) e Objeto Stream (6 + 2*i)
-  const fontF1ObjNum = 3;
-  const fontF2ObjNum = 4;
-  const pageObjStart = 5;
-
-  const pageObjRefs: string[] = [];
-  const pageObjects: string[] = [];
-
-  pagesOps.forEach((ops, idx) => {
-    const pageNum = pageObjStart + idx * 2;
-    const streamNum = pageNum + 1;
-    pageObjRefs.push(`${pageNum} 0 R`);
-
-    const streamBody = ops.join('\n');
-    const pageObj = `${pageNum} 0 obj\n<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 ${fontF1ObjNum} 0 R /F2 ${fontF2ObjNum} 0 R >> >> /Contents ${streamNum} 0 R >>\nendobj\n`;
-    const streamObj = `${streamNum} 0 obj\n<< /Length ${streamBody.length} >>\nstream\n${streamBody}\nendstream\nendobj\n`;
-    pageObjects.push(pageObj, streamObj);
-  });
-
-  const objects: string[] = [
-    '1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n',
-    `2 0 obj\n<< /Type /Pages /Kids [${pageObjRefs.join(' ')}] /Count ${totalPages} >>\nendobj\n`,
-    '3 0 obj\n<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>\nendobj\n',
-    '4 0 obj\n<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>\nendobj\n',
-    ...pageObjects,
-  ];
-
-  let pdf = '%PDF-1.4\n';
-  const offsets: number[] = [0];
-
-  for (const obj of objects) {
-    offsets.push(pdf.length);
-    pdf += obj;
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(7.5);
+    doc.setTextColor(63, 63, 70);
+    doc.text(`Pagina ${i} de ${totalPages}`, pageWidth - marginX, footerLineY + 5, {
+      align: 'right',
+    });
   }
 
-  const xrefStart = pdf.length;
-  pdf += `xref\n0 ${objects.length + 1}\n`;
-  pdf += '0000000000 65535 f \n';
-  for (let i = 1; i <= objects.length; i++) {
-    pdf += `${String(offsets[i]).padStart(10, '0')} 00000 n \n`;
-  }
+  return new Uint8Array(doc.output('arraybuffer'));
+}
 
-  pdf += `trailer\n<< /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${xrefStart}\n%%EOF`;
-
-  return new TextEncoder().encode(pdf);
+function isMobileShareDevice(): boolean {
+  if (typeof navigator === 'undefined') return false;
+  const ua = navigator.userAgent || '';
+  const isTouchMac =
+    /Macintosh/i.test(ua) && typeof navigator.maxTouchPoints === 'number' && navigator.maxTouchPoints > 1;
+  return /iPhone|iPad|iPod|Android/i.test(ua) || isTouchMac;
 }
 
 /**
- * Gera e faz o download direto de um arquivo PDF (.pdf) das tarefas no celular ou computador.
+ * Gera e exporta o relatório PDF:
+ * - No iPhone/iOS/Android compatível, usa o compartilhamento nativo (navigator.share) com fallback automático para download direto.
+ * - No computador, faz o download direto instantâneo.
  */
 export function exportTasksToPdf(
   tasks: Task[],
   filename = 'bvs-special-tarefas.pdf',
-  options?: { title?: string; userName?: string },
+  options?: PdfExportOptions,
 ): boolean {
   if (typeof document === 'undefined') return false;
 
+  const finalFilename = filename.endsWith('.pdf') ? filename : `${filename}.pdf`;
   const pdfBytes = generateTasksPdfBytes(tasks, options);
-  const blob = new Blob([pdfBytes], { type: 'application/pdf' });
-  const url = URL.createObjectURL(blob);
+  const blobBuffer = new Uint8Array(pdfBytes);
+  const blob = new Blob([blobBuffer], { type: 'application/pdf' });
 
-  const link = document.createElement('a');
-  link.href = url;
-  link.setAttribute('download', filename.endsWith('.pdf') ? filename : `${filename}.pdf`);
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
+  const triggerDownload = () => {
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', finalFilename);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    setTimeout(() => URL.revokeObjectURL(url), 2500);
+  };
 
-  setTimeout(() => URL.revokeObjectURL(url), 2500);
+  // Compartilhamento nativo no iOS / Mobile via Web Share API Level 2 (files)
+  if (isMobileShareDevice() && typeof File !== 'undefined' && typeof navigator !== 'undefined') {
+    try {
+      const pdfFile = new File([blob], finalFilename, { type: 'application/pdf' });
+      const navWithShare = navigator as Navigator & {
+        canShare?: (data: ShareData) => boolean;
+      };
+      if (typeof navWithShare.share === 'function' && navWithShare.canShare?.({ files: [pdfFile] })) {
+        void navWithShare
+          .share({
+            files: [pdfFile],
+            title: options?.title || 'BVS Special — Relatório de Tarefas',
+          })
+          .catch((err: unknown) => {
+            // Se o usuário cancelou o share sheet manualmente, não força download duplo
+            if (err instanceof Error && err.name === 'AbortError') return;
+            triggerDownload();
+          });
+        return true;
+      }
+    } catch {
+      // Fallback direto para download padrão
+    }
+  }
+
+  triggerDownload();
   return true;
 }
