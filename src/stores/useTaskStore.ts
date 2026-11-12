@@ -17,6 +17,7 @@ import {
   apiClearUserData,
   apiDeleteFolder,
   apiDeleteTask,
+  apiDeleteTasksBulk,
   apiGoogleAuth,
   apiLogin,
   apiLogout,
@@ -78,6 +79,7 @@ export interface TaskStore {
   upsertTasksBulk: (tasksToUpsert: Task[]) => Promise<{ ok: boolean; count: number; synced: boolean; error?: string }>;
   toggleTask: (id: string) => void;
   deleteTask: (id: string) => void;
+  deleteTasksBulk: (ids: string[]) => Promise<{ ok: boolean; count: number; synced: boolean }>;
   markTaskNotified: (id: string) => void;
   addAttachmentToTask: (taskId: string, attachment: TaskAttachment) => void;
   removeAttachmentFromTask: (taskId: string, attachmentId: string) => void;
@@ -221,6 +223,30 @@ export const useTaskStore = create<TaskStore>()(
         const nextTasks = get().tasks.filter((task) => task.id !== id);
         set({ tasks: nextTasks });
         void apiDeleteTask(id);
+      },
+
+      deleteTasksBulk: async (ids) => {
+        const cleanIds = Array.from(
+          new Set((Array.isArray(ids) ? ids : []).map((id) => String(id || '').trim()).filter(Boolean)),
+        );
+        if (cleanIds.length === 0) {
+          return { ok: false, count: 0, synced: false };
+        }
+        const idSet = new Set(cleanIds);
+        const nextTasks = get().tasks.filter((task) => !idSet.has(task.id));
+        set({ tasks: nextTasks });
+
+        const apiRes = await apiDeleteTasksBulk(cleanIds);
+        if (apiRes.ok) {
+          if (Array.isArray(apiRes.tasks)) {
+            set({ tasks: apiRes.tasks });
+          }
+          return { ok: true, count: cleanIds.length, synced: true };
+        }
+        if (apiRes.offline) {
+          set({ pendingOfflineSync: true });
+        }
+        return { ok: true, count: cleanIds.length, synced: false };
       },
 
       markTaskNotified: (id) => {

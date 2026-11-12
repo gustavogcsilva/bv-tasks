@@ -3,6 +3,7 @@ import { format, isSameDay, isValid, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { IosInstallBanner } from './components/IosInstallBanner';
 import { LeftMenuBar } from './components/LeftMenuBar';
+import { LiveClockBadge } from './components/LiveClockBadge';
 import { MobileBottomNav, type WorkspaceTab } from './components/MobileBottomNav';
 import { Button } from './components/ui/Button';
 import { Logo } from './components/ui/Logo';
@@ -104,6 +105,7 @@ export function BVTasksApp() {
   const upsertTasksBulk = useTaskStore((state) => state.upsertTasksBulk);
   const toggleTask = useTaskStore((state) => state.toggleTask);
   const deleteTask = useTaskStore((state) => state.deleteTask);
+  const deleteTasksBulk = useTaskStore((state) => state.deleteTasksBulk);
   const markTaskNotified = useTaskStore((state) => state.markTaskNotified);
   const addAttachmentToTask = useTaskStore((state) => state.addAttachmentToTask);
   const removeAttachmentFromTask = useTaskStore((state) => state.removeAttachmentFromTask);
@@ -265,7 +267,6 @@ export function BVTasksApp() {
   const completedCount = visibleTasks.filter((task) => task.isCompleted).length;
   const pendingCount = visibleTasks.length - completedCount;
   const dateLabel = format(selectedDate, "EEEE, d 'de' MMMM", { locale: ptBR });
-  const currentYear = new Date().getFullYear();
 
   function handleExportAllPdf() {
     exportTasksToPdf(tasks, `bvs-special-todas-tarefas-${selectedDateKey}.pdf`, {
@@ -474,7 +475,7 @@ export function BVTasksApp() {
       )}
 
       <div className="safe-area-container mx-auto flex min-h-dvh w-full max-w-6xl flex-col">
-      {/* Cabeçalho Principal BVS Special (Vermelho Vinho e Preto + Tipografia HIG + Claro/Escuro) */}
+      {/* Cabeçalho Principal BVS Special (Vermelho Vinho e Preto + Relógio em Tempo Real + Claro/Escuro) */}
         <header className="mb-5 sm:mb-6 flex flex-wrap items-center justify-between gap-2.5 sm:gap-3 pt-1">
           <div className="flex flex-wrap items-center gap-2 sm:gap-2.5">
             <Logo size="md" showText />
@@ -505,6 +506,9 @@ export function BVTasksApp() {
                 </span>
               )}
             </button>
+
+            {/* Relógio e Data Exata em Tempo Real (Formato Brasileiro + tabular-nums) */}
+            <LiveClockBadge />
           </div>
 
           <div className="flex w-full sm:w-auto flex-wrap items-center justify-between sm:justify-end gap-2">
@@ -689,6 +693,16 @@ export function BVTasksApp() {
                 onToggleTodayOnly={setFilterTodayOnly}
                 onToggleTask={toggleTask}
                 onDeleteTask={deleteTask}
+                onDeleteTasksBulk={async (ids) => {
+                  const res = await deleteTasksBulk(ids);
+                  if (res.ok) {
+                    showToast(
+                      `🗑️ ${res.count} tarefa(s) excluída(s) em lote com sucesso!`,
+                      'info',
+                    );
+                  }
+                  return res;
+                }}
                 onAddAttachment={addAttachmentToTask}
                 onRemoveAttachment={removeAttachmentFromTask}
                 onNewTask={() => setIsModalVisible(true)}
@@ -1017,13 +1031,12 @@ export function BVTasksApp() {
           </div>
         )}
 
-        {/* Rodapé Executivo com Ano Dinâmico Automático (2026 -> 2027 -> ...) */}
-        <footer className="mt-8 border-t border-[#E5E4E0] py-5 text-center text-[12px] font-semibold text-[#71717A] dark:border-[#27272A] dark:text-[#A1A1AA]">
-          <p className="font-heading">
-            <span className="font-display font-black text-[#991B1B] dark:text-[#F87171]">BVS Special</span>{' '}
-            — Created By{' '}
-            <span className="font-bold text-[#0F0F12] dark:text-[#FAFAFA]">Gustavo Geraldo</span> ©{' '}
-            <span>{currentYear}</span>
+        {/* Rodapé Limpo, Contínuo e Minimalista (Sem linhas divisórias ou separadores verticais) */}
+        <footer className="safe-bottom mt-8 py-5 text-center text-[12px] font-semibold text-[#71717A] dark:text-[#A1A1AA]">
+          <p className="font-heading tracking-wide">
+            <span className="font-display font-extrabold text-[#6F1D2B] dark:text-[#FCA5A5]">
+              B V Tasks • BVS Special
+            </span>
           </p>
         </footer>
       </div>

@@ -10,6 +10,7 @@ import {
   BulkImportRow,
   Priority,
   SCOPE_CONFIG,
+  Scope,
   TaskDraft,
   TaskFolder,
 } from '../../tasks/types/task.types';
@@ -30,6 +31,32 @@ const PRIORITY_BADGES: Record<Priority, string> = {
   low: 'Baixa',
 };
 
+const CONTEXT_OPTIONS: Array<{
+  scope: Scope;
+  label: 'Pessoal' | 'Trabalho' | 'Estudo';
+  icon: string;
+  subtitle: string;
+}> = [
+  {
+    scope: 'personal',
+    label: 'Pessoal',
+    icon: '🏠',
+    subtitle: 'Rotina, família, saúde e compromissos',
+  },
+  {
+    scope: 'work',
+    label: 'Trabalho',
+    icon: '💼',
+    subtitle: 'Reuniões, entregas e metas executivas',
+  },
+  {
+    scope: 'study',
+    label: 'Estudo',
+    icon: '📚',
+    subtitle: 'Cursos, leituras, pós e certificações',
+  },
+];
+
 /**
  * Modal / Bottom Sheet responsivo para importação de planejamento em lote (.xlsx, .xls, .csv, .json),
  * download da planilha modelo e prompt otimizado para geração de cronogramas com IA.
@@ -44,6 +71,7 @@ export const BulkImportModal: React.FC<BulkImportModalProps> = ({
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [rows, setRows] = useState<BulkImportRow[]>([]);
   const [fileName, setFileName] = useState<string | null>(null);
+  const [selectedContextScope, setSelectedContextScope] = useState<Scope | null>(null);
   const [selectedFolderId, setSelectedFolderId] = useState<string>('');
   const [jsonPasteOpen, setJsonPasteOpen] = useState(false);
   const [jsonText, setJsonText] = useState('');
@@ -59,6 +87,19 @@ export const BulkImportModal: React.FC<BulkImportModalProps> = ({
     return null;
   }
 
+  const applyBatchContextToList = (list: BulkImportRow[], targetScope: Scope | null) => {
+    if (!targetScope) return list;
+    return list.map((row) => ({
+      ...row,
+      scope: targetScope,
+    }));
+  };
+
+  const handleSelectContextScope = (scope: Scope) => {
+    setSelectedContextScope(scope);
+    setRows((prev) => applyBatchContextToList(prev, scope));
+  };
+
   const handleFileChange = async (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
@@ -73,7 +114,7 @@ export const BulkImportModal: React.FC<BulkImportModalProps> = ({
         setParseError('Nenhuma linha encontrada na planilha/arquivo selecionado.');
         setRows([]);
       } else {
-        setRows(parsed);
+        setRows(applyBatchContextToList(parsed, selectedContextScope));
       }
     } catch (error) {
       setParseError(
@@ -101,7 +142,7 @@ export const BulkImportModal: React.FC<BulkImportModalProps> = ({
         setRows([]);
       } else {
         setFileName('JSON colado da IA');
-        setRows(parsed);
+        setRows(applyBatchContextToList(parsed, selectedContextScope));
         setJsonPasteOpen(false);
       }
     } catch (error) {
@@ -282,6 +323,97 @@ export const BulkImportModal: React.FC<BulkImportModalProps> = ({
             </div>
           )}
 
+          {/* Seletor Visual Destacado de Contexto/Categoria do Lote Importado (Pessoal, Trabalho, Estudo) */}
+          <div className="rounded-2xl border border-[#E6E2DA] bg-[#FAF9F6] p-3.5 sm:p-4 dark:border-[#27272A] dark:bg-[#202026]">
+            <div className="mb-2.5 flex flex-wrap items-center justify-between gap-2">
+              <div>
+                <span className="block text-[11px] font-extrabold uppercase tracking-wider text-[#6F1D2B] dark:text-[#FCA5A5]">
+                  Contexto / Categoria do Lote Importado
+                </span>
+                <p className="text-[12px] text-[#52525B] dark:text-[#A1A1AA]">
+                  Escolha uma opção para classificar automaticamente todas as tarefas importadas neste lote:
+                </p>
+              </div>
+              {selectedContextScope && (
+                <span
+                  className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-extrabold"
+                  style={{
+                    backgroundColor: SCOPE_CONFIG[selectedContextScope].bgLight,
+                    color: SCOPE_CONFIG[selectedContextScope].color,
+                  }}
+                >
+                  ✓ Lote classificado como {SCOPE_CONFIG[selectedContextScope].label}
+                </span>
+              )}
+            </div>
+
+            <div
+              role="radiogroup"
+              aria-label="Contexto padrão do lote importado"
+              className="grid grid-cols-1 gap-2 sm:grid-cols-3"
+            >
+              {CONTEXT_OPTIONS.map((opt) => {
+                const cfg = SCOPE_CONFIG[opt.scope];
+                const isSelected = selectedContextScope === opt.scope;
+                return (
+                  <button
+                    key={opt.scope}
+                    type="button"
+                    role="radio"
+                    aria-checked={isSelected}
+                    onClick={() => handleSelectContextScope(opt.scope)}
+                    className={`flex min-h-[54px] cursor-pointer items-center gap-3 rounded-xl border-2 p-3 text-left transition-all active:scale-[0.98] ${
+                      isSelected
+                        ? 'shadow-sm'
+                        : 'border-[#E6E2DA] bg-white hover:border-[#D6D1C7] dark:border-[#3F3F46] dark:bg-[#18181B]'
+                    }`}
+                    style={
+                      isSelected
+                        ? {
+                            borderColor: cfg.color,
+                            backgroundColor: cfg.bgLight,
+                          }
+                        : undefined
+                    }
+                  >
+                    <span
+                      className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-[17px]"
+                      style={{
+                        backgroundColor: isSelected ? cfg.color : cfg.bgLight,
+                        color: isSelected ? '#FFFFFF' : cfg.color,
+                      }}
+                    >
+                      {opt.icon}
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center justify-between gap-1">
+                        <span
+                          className="font-heading text-[13px] font-extrabold"
+                          style={isSelected ? { color: cfg.color } : undefined}
+                        >
+                          {opt.label}
+                        </span>
+                        <span
+                          className={`flex h-4 w-4 items-center justify-center rounded-full border text-[10px] font-black ${
+                            isSelected
+                              ? 'border-transparent text-white'
+                              : 'border-[#D4D4D8] bg-transparent dark:border-[#52525B]'
+                          }`}
+                          style={isSelected ? { backgroundColor: cfg.color } : undefined}
+                        >
+                          {isSelected ? '✓' : ''}
+                        </span>
+                      </div>
+                      <p className="truncate text-[11px] font-medium text-[#71717A] dark:text-[#A1A1AA]">
+                        {opt.subtitle}
+                      </p>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
           {/* Pasta de Destino (Opcional) */}
           {folders.length > 0 && (
             <div className="flex flex-col gap-1.5 sm:flex-row sm:items-center sm:justify-between">
@@ -428,7 +560,17 @@ export const BulkImportModal: React.FC<BulkImportModalProps> = ({
                         </td>
                         <td className="whitespace-nowrap px-3 py-2 font-mono">{row.date || '—'}</td>
                         <td className="whitespace-nowrap px-3 py-2 font-mono">{row.time || '—'}</td>
-                        <td className="px-3 py-2">{SCOPE_CONFIG[row.scope].label}</td>
+                        <td className="px-3 py-2">
+                          <span
+                            className="inline-flex rounded-full px-2.5 py-0.5 text-[11px] font-bold"
+                            style={{
+                              backgroundColor: SCOPE_CONFIG[row.scope].bgLight,
+                              color: SCOPE_CONFIG[row.scope].color,
+                            }}
+                          >
+                            {SCOPE_CONFIG[row.scope].label}
+                          </span>
+                        </td>
                         <td className="px-3 py-2">{PRIORITY_BADGES[row.priority]}</td>
                         <td className="px-3 py-2 text-right">
                           <button

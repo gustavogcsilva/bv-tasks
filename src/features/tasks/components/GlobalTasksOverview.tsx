@@ -29,6 +29,9 @@ interface GlobalTasksOverviewProps {
   onToggleTodayOnly: (value: boolean) => void;
   onToggleTask: (taskId: string) => void;
   onDeleteTask: (taskId: string) => void;
+  onDeleteTasksBulk?: (
+    taskIds: string[],
+  ) => Promise<{ ok: boolean; count: number; synced: boolean }> | void;
   onAddAttachment: (taskId: string, attachment: TaskAttachment) => void;
   onRemoveAttachment: (taskId: string, attachmentId: string) => void;
   onNewTask: () => void;
@@ -67,6 +70,7 @@ export const GlobalTasksOverview: React.FC<GlobalTasksOverviewProps> = ({
   onToggleTodayOnly,
   onToggleTask,
   onDeleteTask,
+  onDeleteTasksBulk,
   onAddAttachment,
   onRemoveAttachment,
   onNewTask,
@@ -80,10 +84,26 @@ export const GlobalTasksOverview: React.FC<GlobalTasksOverviewProps> = ({
   const [statusFilter, setStatusFilter] = useState<OverviewStatusFilter>('all');
   const [priorityFilter, setPriorityFilter] = useState<Priority | 'all'>('all');
   const [scopeFilter, setScopeFilter] = useState<Scope | 'all'>('all');
+  const [monthFilter, setMonthFilter] = useState<string>('all');
   const [viewMode, setViewMode] = useState<OverviewViewMode>('cards');
   const [isFilterSheetOpen, setIsFilterSheetOpen] = useState(false);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [detailTaskId, setDetailTaskId] = useState<string | null>(null);
+  const [selectedTaskIds, setSelectedTaskIds] = useState<string[]>([]);
+  const [isConfirmingBulkDelete, setIsConfirmingBulkDelete] = useState(false);
+  const [isDeletingBulk, setIsDeletingBulk] = useState(false);
+
+  const availableMonths = useMemo(() => {
+    const set = new Set<string>();
+    const currentMonth = todayIso.slice(0, 7);
+    if (currentMonth) set.add(currentMonth);
+    for (const t of tasks) {
+      if (t.date && t.date.length >= 7) {
+        set.add(t.date.slice(0, 7));
+      }
+    }
+    return Array.from(set).sort();
+  }, [tasks, todayIso]);
 
   const detailTask = useMemo(
     () => (detailTaskId ? tasks.find((t) => t.id === detailTaskId) ?? null : null),
@@ -104,9 +124,10 @@ export const GlobalTasksOverview: React.FC<GlobalTasksOverviewProps> = ({
     if (priorityFilter !== 'all') count += 1;
     if (scopeFilter !== 'all') count += 1;
     if (selectedFolderId !== 'all') count += 1;
+    if (monthFilter !== 'all') count += 1;
     if (filterTodayOnly) count += 1;
     return count;
-  }, [statusFilter, priorityFilter, scopeFilter, selectedFolderId, filterTodayOnly]);
+  }, [statusFilter, priorityFilter, scopeFilter, selectedFolderId, monthFilter, filterTodayOnly]);
 
   const filteredTasks = useMemo(() => {
     const query = searchQuery.trim().toLowerCase();
@@ -114,6 +135,7 @@ export const GlobalTasksOverview: React.FC<GlobalTasksOverviewProps> = ({
     return tasks
       .filter((task) => {
         if (filterTodayOnly && task.date !== todayIso) return false;
+        if (monthFilter !== 'all' && !task.date.startsWith(monthFilter)) return false;
         if (selectedFolderId !== 'all' && task.folderId !== selectedFolderId) return false;
         if (statusFilter === 'pending' && task.isCompleted) return false;
         if (statusFilter === 'completed' && !task.isCompleted) return false;
@@ -144,6 +166,7 @@ export const GlobalTasksOverview: React.FC<GlobalTasksOverviewProps> = ({
     tasks,
     searchQuery,
     filterTodayOnly,
+    monthFilter,
     todayIso,
     selectedFolderId,
     statusFilter,
@@ -151,6 +174,66 @@ export const GlobalTasksOverview: React.FC<GlobalTasksOverviewProps> = ({
     scopeFilter,
     folderMap,
   ]);
+
+  const filteredIdSet = useMemo(() => new Set(filteredTasks.map((t) => t.id)), [filteredTasks]);
+  const existingTaskIdSet = useMemo(() => new Set(tasks.map((t) => t.id)), [tasks]);
+
+  const activeSelectedIds = useMemo(
+    () => selectedTaskIds.filter((id) => existingTaskIdSet.has(id)),
+    [selectedTaskIds, existingTaskIdSet],
+  );
+
+  const selectedIdSet = useMemo(() => new Set(activeSelectedIds), [activeSelectedIds]);
+
+  const allFilteredSelected = useMemo(
+    () =>
+      filteredTasks.length > 0 &&
+      filteredTasks.every((task) => selectedIdSet.has(task.id)),
+    [filteredTasks, selectedIdSet],
+  );
+
+  const handleToggleSelectTask = (taskId: string) => {
+    setIsConfirmingBulkDelete(false);
+    setSelectedTaskIds((prev) =>
+      prev.includes(taskId) ? prev.filter((id) => id !== taskId) : [...prev, taskId],
+    );
+  };
+
+  const handleToggleSelectAllFiltered = () => {
+    setIsConfirmingBulkDelete(false);
+    if (allFilteredSelected) {
+      setSelectedTaskIds((prev) => prev.filter((id) => !filteredIdSet.has(id)));
+    } else {
+      const next = new Set(activeSelectedIds);
+      for (const task of filteredTasks) {
+        next.add(task.id);
+      }
+      setSelectedTaskIds(Array.from(next));
+    }
+  };
+
+  const handleClearSelection = () => {
+    setSelectedTaskIds([]);
+    setIsConfirmingBulkDelete(false);
+  };
+
+  const handleConfirmBulkDelete = async () => {
+    if (activeSelectedIds.length === 0 || isDeletingBulk) return;
+    setIsDeletingBulk(true);
+    try {
+      if (onDeleteTasksBulk) {
+        await onDeleteTasksBulk(activeSelectedIds);
+      } else {
+        for (const id of activeSelectedIds) {
+          onDeleteTask(id);
+        }
+      }
+      setSelectedTaskIds([]);
+      setIsConfirmingBulkDelete(false);
+    } finally {
+      setIsDeletingBulk(false);
+    }
+  };
 
   const kpis = useMemo(() => {
     const total = filteredTasks.length;
@@ -165,6 +248,7 @@ export const GlobalTasksOverview: React.FC<GlobalTasksOverviewProps> = ({
     setStatusFilter('all');
     setPriorityFilter('all');
     setScopeFilter('all');
+    setMonthFilter('all');
     onSelectFolder('all');
     onToggleTodayOnly(false);
   };
@@ -218,6 +302,20 @@ export const GlobalTasksOverview: React.FC<GlobalTasksOverviewProps> = ({
           >
             ☀️ Somente Hoje
           </button>
+
+          <select
+            aria-label="Filtrar por mês"
+            value={monthFilter}
+            onChange={(e) => setMonthFilter(e.target.value)}
+            className="min-h-[44px] sm:min-h-[36px] cursor-pointer rounded-xl border border-[#E6E2DA] bg-white px-3 text-[12px] font-bold text-[#3F3F46] outline-none hover:bg-[#FAF7F2] dark:border-[#27272A] dark:bg-[#1C1C21] dark:text-[#D4D4D8]"
+          >
+            <option value="all">📅 Todos os Meses</option>
+            {availableMonths.map((m) => (
+              <option key={m} value={m}>
+                📅 Mês {m.split('-').reverse().join('/')}
+              </option>
+            ))}
+          </select>
         </div>
       </div>
 
@@ -439,6 +537,74 @@ export const GlobalTasksOverview: React.FC<GlobalTasksOverviewProps> = ({
         </div>
       </div>
 
+      {/* Barra de Seleção em Lote no Topo da Listagem ("Selecionar Todas do mês/filtro atual") */}
+      {filteredTasks.length > 0 && (
+        <div className="flex flex-wrap items-center justify-between gap-2.5 rounded-2xl border border-[#E6E2DA] bg-[#FAF9F6] px-4 py-2.5 dark:border-[#27272A] dark:bg-[#1C1C22]">
+          <label className="inline-flex min-h-[38px] cursor-pointer items-center gap-2.5 text-[13px] font-bold text-[#0F0F12] dark:text-[#FAFAFA]">
+            <input
+              type="checkbox"
+              checked={allFilteredSelected}
+              onChange={handleToggleSelectAllFiltered}
+              aria-label="Selecionar Todas (do mês/filtro atual)"
+              className="h-4 w-4 cursor-pointer accent-[#6F1D2B]"
+            />
+            <span>
+              Selecionar Todas (do mês/filtro atual — {filteredTasks.length})
+            </span>
+          </label>
+
+          {activeSelectedIds.length > 0 && (
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="rounded-lg bg-[#FDF4F5] px-2.5 py-1 text-[12px] font-extrabold text-[#6F1D2B] dark:bg-[#3B1219] dark:text-[#FCA5A5]">
+                {activeSelectedIds.length}{' '}
+                {activeSelectedIds.length === 1
+                  ? 'tarefa selecionada'
+                  : 'tarefas selecionadas'}
+              </span>
+
+              {isConfirmingBulkDelete ? (
+                <div className="flex items-center gap-1.5">
+                  <button
+                    type="button"
+                    disabled={isDeletingBulk}
+                    onClick={() => void handleConfirmBulkDelete()}
+                    className="min-h-[38px] cursor-pointer rounded-xl bg-[#991B1B] px-3.5 text-[12px] font-bold text-white shadow-xs hover:bg-[#7F1D1D] active:scale-95 disabled:opacity-50"
+                  >
+                    {isDeletingBulk
+                      ? 'Excluindo...'
+                      : `Confirmar Exclusão (${activeSelectedIds.length})`}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setIsConfirmingBulkDelete(false)}
+                    className="min-h-[38px] cursor-pointer rounded-xl border border-[#E6E2DA] bg-white px-3 text-[12px] font-bold text-[#52525B] dark:border-[#3F3F46] dark:bg-[#27272A] dark:text-[#D4D4D8]"
+                  >
+                    Cancelar
+                  </button>
+                </div>
+              ) : (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => setIsConfirmingBulkDelete(true)}
+                    className="min-h-[38px] cursor-pointer rounded-xl bg-[#991B1B] px-3.5 text-[12px] font-bold text-white shadow-xs transition-colors hover:bg-[#7F1D1D] active:scale-95"
+                  >
+                    🗑️ Excluir Selecionadas
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleClearSelection}
+                    className="min-h-[38px] cursor-pointer rounded-xl border border-[#E6E2DA] bg-white px-2.5 text-[11px] font-bold text-[#52525B] hover:bg-[#F1EFEA] dark:border-[#3F3F46] dark:bg-[#27272A] dark:text-[#D4D4D8]"
+                  >
+                    Limpar seleção
+                  </button>
+                </>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Lista / Grid de Resultados */}
       {filteredTasks.length === 0 ? (
         <div className="flex flex-col items-center justify-center rounded-[24px] border border-dashed border-[#DFDCD4] bg-white/80 px-6 py-14 text-center dark:border-[#27272A] dark:bg-[#18181B]/70">
@@ -489,6 +655,9 @@ export const GlobalTasksOverview: React.FC<GlobalTasksOverviewProps> = ({
               key={task.id}
               task={task}
               showDateBadge
+              selectable
+              selected={selectedIdSet.has(task.id)}
+              onSelectToggle={() => handleToggleSelectTask(task.id)}
               folder={task.folderId ? folderMap.get(task.folderId) : undefined}
               isRecentlyCreated={recentlyCreatedTaskId === task.id}
               isHighlighted={highlightedTaskId === task.id}
@@ -504,9 +673,18 @@ export const GlobalTasksOverview: React.FC<GlobalTasksOverviewProps> = ({
         /* Modo Tabela / Grid Executivo */
         <div className="overflow-hidden rounded-[22px] border border-[#E6E2DA] bg-white shadow-xs dark:border-[#27272A] dark:bg-[#18181B]">
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[700px] border-collapse text-left text-[13px]">
+            <table className="w-full min-w-[740px] border-collapse text-left text-[13px]">
               <thead>
                 <tr className="border-b border-[#E6E2DA] bg-[#FAF7F2] text-[11px] font-bold uppercase tracking-wider text-[#52525B] dark:border-[#27272A] dark:bg-[#202026] dark:text-[#A1A1AA]">
+                  <th className="w-11 px-3 py-3.5 text-center">
+                    <input
+                      type="checkbox"
+                      checked={allFilteredSelected}
+                      onChange={handleToggleSelectAllFiltered}
+                      aria-label="Selecionar todas da tabela"
+                      className="h-4 w-4 cursor-pointer accent-[#6F1D2B]"
+                    />
+                  </th>
                   <th className="px-4 py-3.5">Status</th>
                   <th className="px-4 py-3.5">Tarefa</th>
                   <th className="px-4 py-3.5">Categoria</th>
@@ -521,14 +699,24 @@ export const GlobalTasksOverview: React.FC<GlobalTasksOverviewProps> = ({
                   const prio = PRIORITY_COLORS[task.priority] ?? PRIORITY_COLORS.medium;
                   const folder = task.folderId ? folderMap.get(task.folderId) : undefined;
                   const brDate = task.date.split('-').reverse().join('/');
+                  const isRowSelected = selectedIdSet.has(task.id);
 
                   return (
                     <tr
                       key={task.id}
                       className={`transition-colors hover:bg-[#FAF7F2]/70 dark:hover:bg-[#222228] ${
                         task.isCompleted ? 'opacity-65' : ''
-                      }`}
+                      } ${isRowSelected ? 'bg-[#FDF4F5]/60 dark:bg-[#2A1215]/40' : ''}`}
                     >
+                      <td className="px-3 py-3 text-center align-middle">
+                        <input
+                          type="checkbox"
+                          checked={isRowSelected}
+                          onChange={() => handleToggleSelectTask(task.id)}
+                          aria-label={`Selecionar tarefa ${task.title}`}
+                          className="h-4 w-4 cursor-pointer accent-[#6F1D2B]"
+                        />
+                      </td>
                       <td className="px-4 py-3 align-middle">
                         <button
                           type="button"
@@ -634,6 +822,67 @@ export const GlobalTasksOverview: React.FC<GlobalTasksOverviewProps> = ({
                 })}
               </tbody>
             </table>
+          </div>
+        </div>
+      )}
+
+      {/* Barra Flutuante de Ações em Lote (Responsiva Mobile & Desktop) */}
+      {activeSelectedIds.length > 0 && (
+        <div
+          role="region"
+          aria-label="Ações para tarefas selecionadas em lote"
+          className="fixed inset-x-3 bottom-[76px] z-40 mx-auto flex max-w-xl flex-wrap items-center justify-between gap-2.5 rounded-2xl border border-[#991B1B]/40 bg-[#0F0F12]/95 px-4 py-3 text-white shadow-2xl backdrop-blur-md md:bottom-6 dark:border-[#FCA5A5]/30 dark:bg-[#18181B]/95"
+        >
+          <div className="flex items-center gap-2">
+            <span className="flex h-6 min-w-[24px] items-center justify-center rounded-full bg-[#991B1B] px-2 text-[12px] font-black text-white">
+              {activeSelectedIds.length}
+            </span>
+            <span className="text-[13px] font-bold">
+              {activeSelectedIds.length === 1
+                ? '1 tarefa selecionada'
+                : `${activeSelectedIds.length} tarefas selecionadas`}
+            </span>
+          </div>
+
+          <div className="flex items-center gap-2">
+            {isConfirmingBulkDelete ? (
+              <>
+                <button
+                  type="button"
+                  disabled={isDeletingBulk}
+                  onClick={() => void handleConfirmBulkDelete()}
+                  className="min-h-[40px] cursor-pointer rounded-xl bg-[#DC2626] px-3.5 text-[12px] font-extrabold text-white shadow-sm hover:bg-[#B91C1C] active:scale-95 disabled:opacity-50"
+                >
+                  {isDeletingBulk
+                    ? 'Excluindo...'
+                    : `Sim, Excluir (${activeSelectedIds.length})`}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIsConfirmingBulkDelete(false)}
+                  className="min-h-[40px] cursor-pointer rounded-xl bg-white/15 px-3 text-[12px] font-bold text-white hover:bg-white/25"
+                >
+                  Cancelar
+                </button>
+              </>
+            ) : (
+              <>
+                <button
+                  type="button"
+                  onClick={() => setIsConfirmingBulkDelete(true)}
+                  className="min-h-[40px] cursor-pointer rounded-xl bg-[#DC2626] px-3.5 text-[12px] font-extrabold text-white shadow-sm hover:bg-[#B91C1C] active:scale-95"
+                >
+                  🗑️ Excluir Selecionadas
+                </button>
+                <button
+                  type="button"
+                  onClick={handleClearSelection}
+                  className="min-h-[40px] cursor-pointer rounded-xl bg-white/10 px-3 text-[12px] font-semibold text-white/90 hover:bg-white/20"
+                >
+                  Cancelar
+                </button>
+              </>
+            )}
           </div>
         </div>
       )}

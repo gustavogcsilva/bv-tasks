@@ -464,6 +464,24 @@ describe('Persistência Multi-Dispositivo Real (Computador ↔ Celular) & Segura
         `http://127.0.0.1:${aiAddr.port}/api/calendar/feed/forged_invalid_token.ics`,
       );
       expect(forgedFeedRes.status).toBe(401);
+
+      // Testa DELETE /api/tasks/bulk (Exclusão em Lote autenticada)
+      const bulkDelRes = await fetch(`http://127.0.0.1:${aiAddr.port}/api/tasks/bulk`, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          ids: ['bulk-1', 'bulk-2'],
+        }),
+      });
+      expect(bulkDelRes.status).toBe(200);
+      const bulkDelJson = await bulkDelRes.json();
+      expect(bulkDelJson.ok).toBe(true);
+      expect(bulkDelJson.deletedCount).toBe(2);
+      expect(bulkDelJson.tasks).toHaveLength(1);
+      expect(bulkDelJson.tasks[0].id).toBe('bulk-3');
     } finally {
       await new Promise((resolve) => aiServer.close(() => resolve()));
     }

@@ -33,6 +33,9 @@ interface TaskItemProps {
   showDateBadge?: boolean;
   isRecentlyCreated?: boolean;
   isHighlighted?: boolean;
+  selectable?: boolean;
+  selected?: boolean;
+  onSelectToggle?: () => void;
   onToggle: () => void;
   onDelete: () => void;
   onOpenDetails?: () => void;
@@ -46,6 +49,9 @@ export function TaskItem({
   showDateBadge = false,
   isRecentlyCreated,
   isHighlighted,
+  selectable = false,
+  selected = false,
+  onSelectToggle,
   onToggle,
   onDelete,
   onOpenDetails,
@@ -104,6 +110,10 @@ export function TaskItem({
       className={`flex min-h-[150px] overflow-hidden transition-all duration-300 ${
         task.isCompleted ? 'opacity-70' : ''
       } ${
+        selected
+          ? 'ring-2 ring-[#6F1D2B] bg-[#FDF4F5]/40 dark:ring-[#FCA5A5] dark:bg-[#2A1215]/30'
+          : ''
+      } ${
         isPulsing
           ? 'animate-task-enter ring-2 ring-[#991B1B] shadow-xl shadow-[#991B1B]/25 animate-highlight-pulse scale-[1.01]'
           : ''
@@ -118,6 +128,20 @@ export function TaskItem({
       <div className="flex flex-1 flex-col justify-between gap-2.5 p-4">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div className="flex flex-wrap items-center gap-2">
+            {selectable && (
+              <label
+                className="inline-flex min-h-[36px] min-w-[36px] cursor-pointer items-center justify-center rounded-lg border border-[#E6E2DA] bg-[#FAF7F2] px-2 transition-colors hover:border-[#6F1D2B] dark:border-[#3F3F46] dark:bg-[#27272A]"
+                title="Selecionar esta tarefa para ação em lote"
+              >
+                <input
+                  type="checkbox"
+                  checked={selected}
+                  onChange={() => onSelectToggle?.()}
+                  aria-label={`Selecionar tarefa ${task.title}`}
+                  className="h-4 w-4 cursor-pointer accent-[#6F1D2B]"
+                />
+              </label>
+            )}
             <Badge
               label={scopeInfo.label}
               color={scopeInfo.color}

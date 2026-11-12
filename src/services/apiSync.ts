@@ -492,6 +492,46 @@ export async function apiClearUserData(): Promise<boolean> {
 }
 
 /**
+ * Exclui múltiplas tarefas em lote no Banco SQL (DELETE /api/tasks/bulk)
+ */
+export async function apiDeleteTasksBulk(ids: string[]): Promise<{
+  ok: boolean;
+  deletedCount?: number;
+  tasks?: Task[];
+  offline?: boolean;
+  error?: string;
+}> {
+  if (!getStoredToken()) {
+    return { ok: false, offline: true, error: 'Sessão local sem token remoto.' };
+  }
+  const res = await safeFetchJson<{
+    ok?: boolean;
+    deletedCount?: number;
+    tasks?: Task[];
+    error?: string;
+  }>('/api/tasks/bulk', {
+    method: 'DELETE',
+    headers: getAuthHeaders(),
+    body: JSON.stringify({ ids }),
+  });
+
+  if (res.offline) {
+    return { ok: false, offline: true, error: 'Sem conexão com o servidor no momento.' };
+  }
+  if (!res.ok || !res.data?.ok) {
+    return {
+      ok: false,
+      error: res.data?.error || 'Falha ao excluir tarefas em lote no servidor.',
+    };
+  }
+  return {
+    ok: true,
+    deletedCount: res.data.deletedCount ?? ids.length,
+    tasks: Array.isArray(res.data.tasks) ? res.data.tasks : undefined,
+  };
+}
+
+/**
  * Insere ou atualiza várias tarefas em lote em uma única transação no Banco SQL (POST /api/tasks/bulk)
  */
 export async function apiBulkTasks(tasks: Task[]): Promise<{

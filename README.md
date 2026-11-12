@@ -1,50 +1,46 @@
-# B.V.S Special 🍾🍷📖 — Executive Planner (Full Stack SQL + PWA iOS & Android)
+# B V Tasks • BVS Special 🍷📖 — Executive Planner (Full Stack SQL + PWA iOS, Android & Desktop)
 
-Aplicação web progressiva (**PWA — Progressive Web App**) Full Stack com **Banco de Dados SQL (PostgreSQL)**, calendário executivo interativo, gerenciamento de pastas, captura com câmera do celular/PDFs, notificações nativas e sincronização multi-dispositivo real (**Computador ↔ iPhone ↔ Android**).
-
-Construída no padrão **Apple Human Interface Guidelines (HIG)** com tipografia nativa de sistema, paleta **Vermelho Vinho (`#991B1B` / `#7F1D1D`) & Preto (`#09090B`)**, alternância entre **Modo Claro e Modo Escuro**, e logotipo exclusivo trazendo **Garrafa de Vinho + Taça de Vinho + Livro Aberto + Iniciais B V**.
+Aplicação web progressiva (**PWA — Progressive Web App**) Full Stack com **Banco de Dados SQL (PostgreSQL)**, Visão Geral Global de tarefas, **Assistente Virtual Vitorino (IA)**, importação de planilhas com seletor de contexto, seleção e exclusão em lote, relógio em tempo real, relatórios executivos em PDF e sincronização nativa com **Apple Calendar (`webcal://` / `.ics`)**.
 
 ---
 
-## 🗄️ Arquitetura SQL Multi-Dispositivo (Fim do Login Volátil)
+## ✨ Principais Funcionalidades e Módulos
 
-### Por que é necessário um Banco SQL no Render?
-1. **Static Site vs. Web Service:** Um *Static Site* no Render serve apenas HTML/CSS/JS estáticos pelo CDN (não executa o servidor Node `server.mjs`). Sem o servidor Node + SQL, as contas ficam salvas apenas no navegador daquele aparelho específico (*login volátil*).
-2. **Disco Efêmero no Plano Gratuito:** Mesmo em um *Web Service*, o disco local gratuito do Render é apagado toda vez que o container hiberna após 15 minutos sem uso.
-3. **Solução Definitiva SQL (`PostgreSQL`):** O backend [`server.mjs`](./server.mjs) conecta-se nativamente ao **PostgreSQL** via variável `DATABASE_URL` e executa automaticamente o schema [`database/schema.sql`](./database/schema.sql) na inicialização, garantindo persistência permanente entre todos os seus aparelhos.
+### 1. 🗂️ Visão Geral Global + Seleção e Exclusão em Lote (`DELETE /api/tasks/bulk`)
+- **Panorama Unificado:** Visualize todas as tarefas criadas de uma só vez com busca instantânea, filtros combináveis (Status, Prioridade, Categoria, Pasta, Mês e Somente Hoje) e alternância entre **Lista/Cards** (ideal para celular) e **Tabela/Grid** (ideal para desktop).
+- **Seleção em Lote (Bulk Select) & Exclusão Múltipla:**
+  - Checkbox **"Selecionar Todas (do mês/filtro atual)"** no topo da listagem e checkboxes individuais em cada card/linha (separados do botão de concluir).
+  - Barra de ações responsiva exibindo a contagem de tarefas selecionadas e botão **"Excluir Selecionadas"** com confirmação rápida, disparando `DELETE /api/tasks/bulk` (`{ ids: [...] }`) para remoção atômica no banco de dados.
 
----
+### 2. 📥 Importação de Planilha com Seletor de Contexto/Categoria (`POST /api/tasks/bulk`)
+- Suporte a arquivos **`.xlsx`, `.xls`, `.csv` e `.json`** (além de download da Planilha Modelo `.xlsx` e gerador de Prompt para IA).
+- **Seletor Visual de Contexto do Lote:** Permite escolher com 1 clique entre **Pessoal**, **Trabalho** ou **Estudo** antes ou durante a pré-visualização, classificando automaticamente todas as tarefas do lote importado e exibindo a categoria na tabela e nos cards de revisão antes de gravar no banco.
 
-## ☁️ Como Ativar o Banco SQL no Render (Passo a Passo Rápido)
+### 3. 👩‍💼 Vitorino — Sua Assistente Virtual de Planejamento (`POST /api/ai/assistant`)
+- Assistente virtual ilustrada com **avatar exclusivo de menina executiva** (Vitorino) e saudação acolhedora:
+  > *"Oi! Sou a Vitorino, sua assistente virtual. No que posso te ajudar hoje? Quer fazer algum tipo de planejamento?"*
+- Cria tarefas, agendas semanais e divide metas complexas em etapas acionáveis com 1 clique em **Confirmar e Adicionar ao Cronograma**.
 
-Você tem **duas opções gratuitas** para ativar a persistência SQL definitiva:
+### 4. ✨ Fechamento Inteligente do Mês com IA (`POST /api/ai/monthly-review`)
+- Analisa estatísticas mensais, taxa de conclusão e gargalos por categoria, gerando diagnóstico executivo, 3 próximos passos práticos e sugestões de tarefas para o mês seguinte, além de migrar pendências em lote.
 
-### Opção A — Automática em 1 Clique via Blueprint do Render (`render.yaml`)
-1. No painel do [Render](https://dashboard.render.com/), remova o *Static Site* antigo (se desejar usar o mesmo nome) e clique em **New +** → **Blueprint**.
-2. Selecione o repositório **`gustavogcsilva/bv-tasks`**.
-3. O Render lerá o arquivo [`render.yaml`](./render.yaml) e criará automaticamente:
-   - O banco SQL **PostgreSQL** (`bv-tasks-sql`);
-   - O **Web Service Node.js** (`bv-tasks`) já conectado ao banco via `DATABASE_URL`!
+### 5. 🕒 Relógio e Data em Tempo Real no Painel Principal
+- Exibe no topo do painel a data completa por extenso em português e o horário exato atualizado a cada segundo (`setInterval` de `1000ms`), com tipografia `tabular-nums` para estabilidade visual dos segundos e versão compacta automática em telas de smartphone.
 
-### Opção B — Banco PostgreSQL Gratuito Permanente (Neon.tech ou Supabase) + Render Web Service
-*(Recomendado caso queira um banco SQL gratuito que nunca expira após 30 dias)*:
-1. Crie um projeto gratuito no **[Neon.tech](https://neon.tech)** ou **[Supabase](https://supabase.com)** e copie a **Connection String (`postgresql://...`)**.
-2. No painel do Render, clique em **New +** → **Web Service** (⚠️ **não** escolha *Static Site*) e conecte o repositório `bv-tasks`:
-   - **Runtime:** `Node`
-   - **Build Command:** `npm install && npm run build`
-   - **Start Command:** `npm start`
-3. Em **Environment Variables**, adicione:
-   - `DATABASE_URL` = *(cole sua string `postgresql://...`)*
-   - `NODE_ENV` = `production`
-4. Pronto! Ao iniciar, o `server.mjs` criará automaticamente as tabelas `bv_users`, `bv_sessions`, `bv_folders` e `bv_tasks`!
+### 6. 📱 PWA iOS Nativo, Atalhos da Apple (Shortcuts) & Apple Calendar (`webcal://`)
+- Configuração `display: "standalone"` com suporte a `safe-area-inset` e Deep Links (`/?action=new-task`, `/?action=import`, `/?action=chat`, `/?action=ai-review`, `/?filter=today`).
+- Exportação `.ics` com Web Share API no iOS e feed de assinatura contínua `GET /api/calendar/feed/:userToken.ics` (`webcal://`).
+
+### 7. 🧼 Rodapé Limpo e Minimalista
+- Rodapé contínuo e sem divisórias exibindo **`B V Tasks • BVS Special`** com suporte ao espaçamento seguro inferior (`safe-bottom`).
 
 ---
 
-## 🛡️ Segurança de Nível Bancário e Limpeza de Dados
-- **Limpeza Total (`v8`):** Todos os dados de teste e caches antigos foram limpos automaticamente via migração `bv-tasks-sql-v8` e Service Worker `v8` (com bypass estrito em `/api/*`).
-- **PBKDF2-HMAC-SHA512 (100.000 iterações):** Senhas e palavras-chave de recuperação protegidas com *salt* único de 16 bytes e comparação em tempo constante (`crypto.timingSafeEqual`).
-- **Tokens de Recuperação Assinados (HMAC-SHA256):** Expiração de 30 minutos contra falsificação de links.
-- **Isolamento Estrito por `user_id`:** Queries SQL parametrizadas (`$1, $2...`) imunes a SQL Injection; ao sair da conta, a memória local do aparelho é limpa imediatamente.
+## 🗄️ Arquitetura SQL Multi-Dispositivo e Segurança
+
+- **Persistência SQL (`PostgreSQL`):** O servidor [`server.mjs`](./server.mjs) conecta-se ao PostgreSQL via `DATABASE_URL` e inicializa automaticamente o schema [`database/schema.sql`](./database/schema.sql) (`bv_users`, `bv_sessions`, `bv_folders`, `bv_tasks`).
+- **Criptografia PBKDF2-HMAC-SHA512 (100.000 iterações):** Senhas e palavras-chave protegidas com *salt* único de 16 bytes e verificação `crypto.timingSafeEqual`.
+- **Isolamento Estrito por `user_id`:** Todas as operações (incluindo `POST /api/tasks/bulk` e `DELETE /api/tasks/bulk`) utilizam queries SQL parametrizadas (`$1, $2...`) vinculadas ao usuário autenticado.
 
 ---
 
@@ -54,14 +50,13 @@ Você tem **duas opções gratuitas** para ativar a persistência SQL definitiva
 # 1. Instalar dependências
 npm install
 
-# 2. (Opcional) Configurar DATABASE_URL no ambiente para testar direto no PostgreSQL
-# Caso não definida, usa armazenamento limpo de desenvolvimento local
+# 2. Iniciar servidor Full Stack
 npm start
 
-# 3. Rodar checagem de tipos, testes automatizados (24 testes) e build
+# 3. Executar verificação de tipos, suíte de testes e build de produção
 npm run typecheck
 npm test
 npm run build
 ```
 
-Para uma explicação simples e acessível, consulte [**EXPLICACAO_PARA_LEIGOS.md**](./EXPLICACAO_PARA_LEIGOS.md).
+Para uma explicação passo a passo voltada a usuários finais, consulte [**EXPLICACAO_PARA_LEIGOS.md**](./EXPLICACAO_PARA_LEIGOS.md).

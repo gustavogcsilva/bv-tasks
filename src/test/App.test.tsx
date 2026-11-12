@@ -108,7 +108,7 @@ describe('Integração da Interface BVS Special PWA (Vinho & Preto, Claro/Escuro
     expect(screen.getByText('Mestrado')).toBeInTheDocument();
 
     // Conclui e exclui a tarefa
-    fireEvent.click(screen.getByRole('checkbox'));
+    fireEvent.click(screen.getByRole('checkbox', { name: /Concluir/i }));
     expect(screen.getByText('✓ Concluída')).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: 'Excluir' }));
@@ -133,7 +133,7 @@ describe('Integração da Interface BVS Special PWA (Vinho & Preto, Claro/Escuro
 
     expect(screen.getAllByText('BVS Special').length).toBeGreaterThanOrEqual(1);
     expect(screen.getAllByText('BVS SPECIAL').length).toBeGreaterThanOrEqual(1);
-    expect(screen.getByText(/Gustavo Geraldo/i)).toBeInTheDocument();
+    expect(screen.getByText(/B V Tasks • BVS Special/i)).toBeInTheDocument();
     expect(
       screen.getAllByText(new RegExp(String(new Date().getFullYear()))).length,
     ).toBeGreaterThanOrEqual(1);
@@ -235,15 +235,22 @@ describe('Integração da Interface BVS Special PWA (Vinho & Preto, Claro/Escuro
     });
     expect(screen.queryByText('Aula de Inglês Executivo')).not.toBeInTheDocument();
 
-    // Abre o Mini-Chatbot Assistente IA
-    fireEvent.click(screen.getByRole('button', { name: /Abrir Assistente IA de Tarefas/i }));
+    // Verifica Relógio em Tempo Real e Rodapé Limpo Unificado
+    expect(screen.getByLabelText('Data e hora em tempo real')).toBeInTheDocument();
+    expect(screen.getByText('B V Tasks • BVS Special')).toBeInTheDocument();
+
+    // Abre a Vitorino (Assistente Virtual)
+    fireEvent.click(screen.getByRole('button', { name: /Abrir Vitorino Assistente Virtual/i }));
     expect(
-      screen.getByRole('dialog', { name: /Assistente IA de Tarefas/i }),
+      screen.getByRole('dialog', { name: /Vitorino Assistente Virtual de Tarefas/i }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(/Oi! Sou a Vitorino, sua assistente virtual/i),
     ).toBeInTheDocument();
     expect(screen.getByLabelText('Mensagem para o Assistente IA')).toBeInTheDocument();
   });
 
-  it('deve abrir o modal Importar Planejamento e pré-visualizar JSON colado da IA', () => {
+  it('deve abrir o modal Importar Planejamento, selecionar contexto (Pessoal/Trabalho/Estudo) e pré-visualizar JSON colado da IA', () => {
     useTaskStore.setState({
       currentUser: {
         id: 'user-1',
@@ -266,6 +273,11 @@ describe('Integração da Interface BVS Special PWA (Vinho & Preto, Claro/Escuro
       within(dialog).getByRole('button', { name: /Copiar Prompt para IA/i }),
     ).toBeInTheDocument();
 
+    // Seleciona o contexto "Estudo" no seletor visual de contexto
+    const estudoRadio = within(dialog).getByRole('radio', { name: /Estudo/i });
+    fireEvent.click(estudoRadio);
+    expect(estudoRadio).toHaveAttribute('aria-checked', 'true');
+
     fireEvent.click(within(dialog).getByRole('button', { name: /Colar JSON da IA/i }));
     fireEvent.change(within(dialog).getByLabelText(/Cole aqui o JSON gerado pela IA/i), {
       target: {
@@ -283,6 +295,7 @@ describe('Integração da Interface BVS Special PWA (Vinho & Preto, Claro/Escuro
     fireEvent.click(within(dialog).getByRole('button', { name: /Pré-visualizar JSON/i }));
 
     expect(within(dialog).getAllByText('Fechamento Contábil').length).toBeGreaterThanOrEqual(1);
+    expect(within(dialog).getByText(/Lote classificado como Estudo/i)).toBeInTheDocument();
     expect(
       within(dialog).getByRole('button', { name: /Confirmar e Importar 1 Tarefa/i }),
     ).toBeEnabled();

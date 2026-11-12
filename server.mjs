@@ -716,6 +716,32 @@ const repo = {
     saveLocalDb(db);
   },
 
+  async deleteTasksBulk(userId, taskIds) {
+    const cleanIds = Array.from(
+      new Set(
+        (Array.isArray(taskIds) ? taskIds : [])
+          .map((id) => String(id || '').trim())
+          .filter(Boolean),
+      ),
+    );
+    if (cleanIds.length === 0) return 0;
+
+    if (usePostgres) {
+      const result = await pgPool.query(
+        'DELETE FROM bv_tasks WHERE user_id = $1 AND id = ANY($2::text[])',
+        [userId, cleanIds],
+      );
+      return Number(result?.rowCount ?? cleanIds.length);
+    }
+
+    const db = readLocalDb();
+    const idSet = new Set(cleanIds);
+    const beforeCount = db.tasks.length;
+    db.tasks = db.tasks.filter((t) => !(t.user_id === userId && idSet.has(t.id)));
+    saveLocalDb(db);
+    return Math.max(0, beforeCount - db.tasks.length);
+  },
+
   async upsertFolder(userId, folder) {
     const id = String(folder.id || '').trim();
     const name = String(folder.name || '').trim();
@@ -1136,7 +1162,17 @@ function buildSmartAssistantFallback({ message, currentDate }) {
   if (offTopicPatterns.some((rx) => rx.test(lower)) && !hasTaskIntent) {
     return {
       reply:
-        'Sou o assistente exclusivo de gestão de tarefas do BVS Special e posso ajudar apenas a criar, organizar ou planejar suas atividades.',
+        'Oi! Sou a Vitorino, sua assistente virtual exclusiva de gestão de tarefas do B V Tasks, e posso ajudar apenas a criar, organizar ou planejar suas atividades.',
+      suggestedTasks: [],
+    };
+  }
+
+  if (
+    /^(oi|olá|ola|bom\s+dia|boa\s+tarde|boa\s+noite|tudo\s+bem|ei|vitorino)[!,.?\s]*$/i.test(text)
+  ) {
+    return {
+      reply:
+        'Oi! Sou a Vitorino, sua assistente virtual. No que posso te ajudar hoje? Quer fazer algum tipo de planejamento?',
       suggestedTasks: [],
     };
   }
@@ -1453,12 +1489,12 @@ async function runGeminiTaskAssistant({
     .join('\n');
 
   const systemPrompt = [
-    'Você é o Assistente Executivo de Ação Rápida do aplicativo B V Tasks (BVS Special).',
+    'Você é a Vitorino, sua assistente virtual executiva de ação rápida do aplicativo B V Tasks (BVS Special).',
     'ESCOPO EXCLUSIVO: Você deve responder EXCLUSIVAMENTE sobre gestão de tarefas, produtividade, criação de cronogramas, divisão de metas em subtarefas e organização de horários.',
-    'Se a mensagem do usuário fugir de tarefas/produtividade/organização pessoal ou profissional, recuse educadamente em 1 frase curta em "reply" e retorne "suggestedTasks": [].',
+    'Se a mensagem do usuário fugir de tarefas/produtividade/organização pessoal ou profissional, recuse educadamente em 1 frase curta em "reply" apresentando-se como Vitorino e retorne "suggestedTasks": [].',
     `Data atual de referência: ${safeCurrentDate}.`,
     'Retorne SEMPRE um JSON válido com:',
-    '- "reply": resposta curta, direta e cordial em português brasileiro.',
+    '- "reply": resposta curta, simpática, direta e cordial em português brasileiro (assinando ou falando como Vitorino quando apropriado).',
     '- "suggestedTasks": lista de tarefas acionáveis (vazia se nenhuma tarefa precisar ser criada), cada uma com "title", "description", "date" (YYYY-MM-DD), "time" (HH:MM opcional), "category" ("Trabalho", "Pessoal" ou "Estudo") e "priority" ("Alta", "Média" ou "Baixa").',
   ].join('\n');
 
@@ -2152,6 +2188,54 @@ async function handleApiRequest(req, res, pathname, serverOptions = {}) {
       return sendJson(res, 500, {
         ok: false,
         error: 'Erro ao consultar o Assistente IA de tarefas. Tente novamente.',
+      });
+    }
+  }
+
+  // DELETE /api/tasks/bulk -> Exclui múltiplas tarefas em lote de uma só vez no SQL
+  if (method === 'DELETE' && pathname === '/api/tasks/bulk') {
+    try {
+      const body = await parseJsonBody(req);
+      const rawIds = Array.isArray(body?.ids) ? body.ids : null;
+      if (!rawIds || rawIds.length === 0) {
+        return sendJson(res, 400, {
+          ok: false,
+          error: 'Envie uma lista não vazia em "ids" para exclusão em lote.',
+        });
+      }
+      if (rawIds.length > 1000) {
+        return sendJson(res, 400, {
+          ok: false,
+          error: 'O limite por exclusão em lote é de 1.000 tarefas por vez.',
+        });
+      }
+      const cleanIds = Array.from(
+        new Set(
+          rawIds
+            .map((id) => String(id || '').trim().slice(0, 128))
+            .filter(Boolean),
+        ),
+      );
+      if (cleanIds.length === 0) {
+        return sendJson(res, 400, {
+          ok: false,
+          error: 'Nenhum ID de tarefa válido informado.',
+        });
+      }
+
+      const deletedCount = await repo.deleteTasksBulk(userId, cleanIds);
+      const userData = await repo.getUserData(userId);
+      return sendJson(res, 200, {
+        ok: true,
+        deletedCount,
+        deletedIds: cleanIds,
+        tasks: userData.tasks,
+      });
+    } catch (err) {
+      console.error('[Bulk Delete Tasks Error]', err);
+      return sendJson(res, 500, {
+        ok: false,
+        error: 'Erro interno ao excluir tarefas em lote.',
       });
     }
   }

@@ -34,9 +34,74 @@ const QUICK_PROMPTS = [
 ];
 
 /**
- * Mini-Chatbot Assistente de Ação Rápida (Exclusivo para Tarefas e Produtividade):
+ * Ilustração vetorial (SVG) da Vitorino — Assistente Virtual (desenho de uma menina executiva simpática, não robô).
+ */
+export const VitorinoGirlAvatar: React.FC<{ size?: number; className?: string }> = ({
+  size = 34,
+  className = '',
+}) => (
+  <svg
+    width={size}
+    height={size}
+    viewBox="0 0 64 64"
+    fill="none"
+    xmlns="http://www.w3.org/2000/svg"
+    aria-hidden="true"
+    className={`shrink-0 rounded-full ${className}`}
+  >
+    {/* Fundo circular suave */}
+    <circle cx="32" cy="32" r="30" fill="#FDF2F4" stroke="#FBCFE8" strokeWidth="2" />
+    {/* Cabelo longo atrás */}
+    <path
+      d="M14 30C14 17.8497 22.0589 10 32 10C41.9411 10 50 17.8497 50 30V48C50 51.3137 47.3137 54 44 54H20C16.6863 54 14 51.3137 14 48V30Z"
+      fill="#3B1D1A"
+    />
+    {/* Blazer / Roupa Executiva Vinho BVS */}
+    <path
+      d="M16 56C17.8 47.8 24.1 44 32 44C39.9 44 46.2 47.8 48 56H16Z"
+      fill="#6F1D2B"
+    />
+    {/* Gola clara */}
+    <path d="M27 44L32 50L37 44H27Z" fill="#FFF1F2" />
+    {/* Pescoço */}
+    <rect x="28.5" y="39" width="7" height="6" rx="3" fill="#FCD5B5" />
+    {/* Rosto da menina */}
+    <path
+      d="M20 28C20 20.8203 25.3726 15 32 15C38.6274 15 44 20.8203 44 28V31C44 37.6274 38.6274 42 32 42C25.3726 42 20 37.6274 20 31V28Z"
+      fill="#FDE2C8"
+    />
+    {/* Franja estilizada feminina */}
+    <path
+      d="M19 27C19.5 18.5 25 13.5 32 13.5C39 13.5 44.5 18.5 45 27C41.5 23.5 37.5 21 32 22C26.5 21 22.5 23.5 19 27Z"
+      fill="#4A2521"
+    />
+    {/* Laço / Presilha delicada no cabelo */}
+    <circle cx="42" cy="20" r="3" fill="#E11D48" />
+    <circle cx="42" cy="20" r="1.2" fill="#FDE68A" />
+    {/* Olhos expressivos com cílios */}
+    <ellipse cx="26.5" cy="29.5" rx="2.1" ry="2.4" fill="#1F1216" />
+    <ellipse cx="37.5" cy="29.5" rx="2.1" ry="2.4" fill="#1F1216" />
+    <circle cx="25.8" cy="28.7" r="0.8" fill="#FFFFFF" />
+    <circle cx="36.8" cy="28.7" r="0.8" fill="#FFFFFF" />
+    <path d="M24 27.2C25.2 26.2 27.4 26.2 28.8 27" stroke="#3B1D1A" strokeWidth="1.3" strokeLinecap="round" />
+    <path d="M35.2 27C36.6 26.2 38.8 26.2 40 27.2" stroke="#3B1D1A" strokeWidth="1.3" strokeLinecap="round" />
+    {/* Bochechas rosadas */}
+    <ellipse cx="23.5" cy="33" rx="2.3" ry="1.3" fill="#FDA4AF" fillOpacity="0.65" />
+    <ellipse cx="40.5" cy="33" rx="2.3" ry="1.3" fill="#FDA4AF" fillOpacity="0.65" />
+    {/* Sorriso simpático */}
+    <path
+      d="M28.5 35.2C29.6 36.8 34.4 36.8 35.5 35.2"
+      stroke="#9F1239"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+    />
+  </svg>
+);
+
+/**
+ * Mini-Chatbot Assistente Virtual "Vitorino" (Exclusiva para Tarefas e Planejamento):
  * - Widget flutuante lateral no Desktop (md:) e Gaveta / Tela Cheia no Mobile (< 768px)
- * - Conectado ao Google Gemini 2.5 Flash (POST /api/ai/assistant) e inserção em lote (POST /api/tasks/bulk)
+ * - Conectada ao Google Gemini 2.5 Flash (POST /api/ai/assistant) e inserção em lote (POST /api/tasks/bulk)
  */
 export const TaskAssistantChat: React.FC<TaskAssistantChatProps> = ({
   visible,
@@ -52,7 +117,7 @@ export const TaskAssistantChat: React.FC<TaskAssistantChatProps> = ({
     {
       id: 'welcome-msg',
       role: 'assistant',
-      text: 'Olá! Sou o Assistente Executivo BVS Special (exclusivo para gestão de tarefas). Diga qual meta ou rotina deseja organizar e eu preparo as tarefas prontas para adicionar ao seu cronograma com 1 toque.',
+      text: 'Oi! Sou a Vitorino, sua assistente virtual. No que posso te ajudar hoje? Quer fazer algum tipo de planejamento?',
       createdAt: new Date().toISOString(),
     },
   ]);
@@ -184,18 +249,16 @@ export const TaskAssistantChat: React.FC<TaskAssistantChatProps> = ({
 
   return (
     <>
-      {/* Botão Flutuante Desktop para abrir o Mini-Chatbot Assistente IA */}
+      {/* Botão Flutuante Desktop para abrir a Vitorino (Assistente Virtual) */}
       {!visible && (
         <button
           type="button"
           onClick={onOpen}
-          aria-label="Abrir Assistente IA de Tarefas"
-          className="fixed right-6 bottom-6 z-40 hidden min-h-[50px] cursor-pointer items-center gap-2.5 rounded-full border border-[#FDE68A]/50 bg-gradient-to-r from-[#0F0F12] via-[#450A0A] to-[#991B1B] px-5 py-3 text-[13px] font-bold text-white shadow-[0_10px_28px_rgba(111,29,43,0.45)] transition-transform hover:scale-[1.03] active:scale-95 md:flex"
+          aria-label="Abrir Vitorino Assistente Virtual"
+          className="fixed right-6 bottom-6 z-40 hidden min-h-[52px] cursor-pointer items-center gap-2.5 rounded-full border border-[#FDE68A]/50 bg-gradient-to-r from-[#0F0F12] via-[#450A0A] to-[#991B1B] pl-2.5 pr-5 py-2 text-[13px] font-bold text-white shadow-[0_10px_28px_rgba(111,29,43,0.45)] transition-transform hover:scale-[1.03] active:scale-95 md:flex"
         >
-          <span className="text-[18px]" aria-hidden="true">
-            🤖
-          </span>
-          <span className="font-heading">Assistente IA</span>
+          <VitorinoGirlAvatar size={34} />
+          <span className="font-heading">Vitorino • Assistente</span>
         </button>
       )}
 
@@ -204,21 +267,19 @@ export const TaskAssistantChat: React.FC<TaskAssistantChatProps> = ({
           className="fixed inset-0 z-50 flex items-end justify-end bg-black/50 backdrop-blur-[2px] md:bg-black/25 md:p-6"
           role="dialog"
           aria-modal="true"
-          aria-label="Assistente IA de Tarefas"
+          aria-label="Vitorino Assistente Virtual de Tarefas"
         >
           <div className="animate-sheet-up safe-bottom flex h-[92dvh] w-full flex-col overflow-hidden rounded-t-[28px] border border-[#E6E2DA] bg-white shadow-2xl md:h-[640px] md:max-h-[85dvh] md:w-[430px] md:rounded-[26px] dark:border-[#27272A] dark:bg-[#18181B]">
-            {/* Cabeçalho do Mini-Chatbot */}
+            {/* Cabeçalho da Vitorino */}
             <div className="flex items-center justify-between border-b border-[#450A0A]/20 bg-gradient-to-r from-[#0F0F12] via-[#450A0A] to-[#7F1D1D] px-4 py-3.5 text-white">
               <div className="flex items-center gap-2.5">
-                <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-white/15 text-[18px]">
-                  🤖
-                </span>
+                <VitorinoGirlAvatar size={40} className="ring-2 ring-[#FDE68A]/60" />
                 <div>
                   <h2 className="font-heading text-[15px] font-bold leading-tight">
-                    Assistente IA • BVS Special
+                    Vitorino • Assistente Virtual
                   </h2>
                   <p className="text-[11px] text-[#FDE68A]">
-                    Exclusivo para Tarefas &amp; Cronograma (Gemini 2.5)
+                    Planejamento &amp; Organização de Tarefas
                   </p>
                 </div>
               </div>
@@ -343,8 +404,8 @@ export const TaskAssistantChat: React.FC<TaskAssistantChatProps> = ({
 
               {isSending && (
                 <div className="flex items-center gap-2 text-[12px] font-semibold text-[#71717A]">
-                  <span className="animate-pulse">🤖</span>
-                  <span>Estruturando tarefas com Gemini...</span>
+                  <VitorinoGirlAvatar size={24} className="animate-pulse" />
+                  <span>Vitorino está preparando seu planejamento...</span>
                 </div>
               )}
               <div ref={scrollEndRef} />

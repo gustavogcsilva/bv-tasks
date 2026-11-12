@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import { format, isValid, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { VitorinoGirlAvatar } from '../features/ai-assistant/components/TaskAssistantChat';
 import { SCOPE_CONFIG, type Task, type UserAccount } from '../features/tasks/types/task.types';
 
 interface LeftMenuBarProps {
@@ -278,7 +279,8 @@ export function LeftMenuBar({
               }}
               className="flex min-h-[44px] w-full cursor-pointer items-center justify-center gap-2 rounded-xl border border-[#FDE68A]/50 bg-gradient-to-r from-[#0F0F12] via-[#450A0A] to-[#991B1B] px-3 text-[12px] font-bold text-white shadow-xs transition-all hover:opacity-95 active:scale-95"
             >
-              <span>🤖 Assistente IA (Ação Rápida)</span>
+              <VitorinoGirlAvatar size={22} />
+              <span>Vitorino • Assistente Virtual</span>
             </button>
           )}
           {onOpenImport && (
